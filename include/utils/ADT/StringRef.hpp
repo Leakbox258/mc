@@ -2,10 +2,13 @@
 #define UTILS_ADT_STRINGREF
 
 #include "ArrayRef.hpp"
+#include "SmallVector.hpp"
 #include "iterator_range.hpp"
 #include "utils/macro.hpp"
+#include <array>
 #include <cassert>
 #include <cstddef>
+#include <cstdio>
 #include <cstring>
 #include <iterator>
 #include <string>
@@ -13,6 +16,11 @@
 #include <type_traits>
 namespace utils {
 namespace ADT {
+
+template <typename T>
+concept IsIntegralPtr =
+    std::conjunction_v<std::is_pointer<T>,
+                       std::is_integral<std::remove_pointer_t<T>>>;
 
 class StringRef {
   public:
@@ -48,23 +56,53 @@ class StringRef {
     constexpr StringRef(const StringRef& StrRef)
         : Data(StrRef.Data), Length(StrRef.Length) {}
 
-    template <typename T> StringRef& operator=(T&& StrRef) = delete;
+    template <typename T> constexpr StringRef& operator=(T&& StrRef) {
+        static_assert(std::is_same_v<T, StringRef> ||
+                      std::is_same_v<T, std::string_view> ||
+                      std::is_same_v<T, const std::string&> ||
+                      std::is_same_v<T, const char*>);
+        if constexpr (std::is_same_v<T, StringRef>) {
+            Data = StrRef.Data;
+            Length = StrRef.Length;
+        } else if constexpr (std::is_same_v<T, std::string_view>) {
+            Data = StrRef.data();
+            Length = StrRef.size();
+        } else if constexpr (std::is_same_v<T, const std::string&>) {
+            Data = StrRef.data();
+            Length = StrRef.size();
+        } else if constexpr (std::is_same_v<T, const char*>) {
+            Data = StrRef;
+            Length = StrRef ? std::strlen(StrRef) : 0;
+        }
+
+        return *this;
+    }
 
     [[nodiscard]] constexpr const char* data() const { return Data; }
     [[nodiscard]] constexpr size_ty size() const { return Length; }
     [[nodiscard]] constexpr bool empty() const { return !Length; }
 
+    std::string str() const { return std::string(data(), size()); }
+    constexpr std::string_view str_view() const {
+        return std::string_view(data(), size());
+    }
+    constexpr const char* c_str() const { return data(); }
+
     /// @}
     /// @name Iters
     /// @{
 
-    iter begin() const { return data(); }
+    constexpr iter begin() const { return data(); }
 
-    iter end() const { return data() + size(); }
+    constexpr iter end() const { return data() + size(); }
 
-    rev_iter rbegin() const { return std::make_reverse_iterator(end()); }
+    constexpr rev_iter rbegin() const {
+        return std::make_reverse_iterator(end());
+    }
 
-    rev_iter rend() const { return std::make_reverse_iterator(begin()); }
+    constexpr rev_iter rend() const {
+        return std::make_reverse_iterator(begin());
+    }
 
     const unsigned char* bytes_begin() const {
         return reinterpret_cast<const unsigned char*>(begin());
@@ -93,7 +131,7 @@ class StringRef {
             return false;
         }
 
-        return !std::memcmp(this->data(), StrRef.data(), this->size());
+        return !utils::memcmp(this->data(), StrRef.data(), this->size());
     }
 
     /// c-style char array
@@ -103,7 +141,7 @@ class StringRef {
             return false;
         }
 
-        return !std::memcmp(this->data(), Array, N);
+        return !utils::memcmp(this->data(), Array, N);
     }
 
     template <typename T>
@@ -121,6 +159,70 @@ class StringRef {
     [[nodiscard]] char operator[](std::size_t index) const {
         assert(index < this->size());
         return data()[index];
+    }
+
+    template <std::size_t N>
+    constexpr std::array<StringRef, N> split(char splitor) const {
+        char const* current = this->data();
+        char const* last = current;
+
+        std::array<StringRef, N> elements{};
+        unsigned cnt = 0;
+        while (*current != '\0') {
+
+            if (*current == splitor) {
+                if (current != last) {
+                    // avoid empty StringRef
+                    // which may happen when multi splitor or never trim
+                    elements[cnt++] =
+                        std::move(StringRef(last, current - last));
+                }
+
+                last = current += 1;
+            } else {
+                ++current;
+            }
+        }
+
+        if (current != last && *last != splitor) {
+            elements[cnt++] = std::move(StringRef(last, current - last));
+        }
+
+        return elements;
+    }
+
+    [[nodiscard]] constexpr StringRef
+    slice(std::size_t Start,
+          std::size_t End = std::numeric_limits<std::size_t>::max()) const {
+        Start = std::min(Start, size());
+        End = std::clamp(End, Start, size());
+        return StringRef(data() + Start, End - Start);
+    }
+
+    [[nodiscard]] constexpr bool begin_with(StringRef Prefix) const {
+        return size() >= Prefix.size() &&
+               utils::memcmp(begin(), Prefix.data(), Prefix.size()) == 0;
+    }
+    [[nodiscard]] constexpr bool begin_with(char Prefix) const {
+        return !empty() && front() == Prefix;
+    }
+
+    [[nodiscard]] constexpr bool end_with(StringRef Suffix) const {
+        return size() >= Suffix.size() &&
+               utils::memcmp(end() - Suffix.size(), Suffix.data(),
+                             Suffix.size()) == 0;
+    }
+    [[nodiscard]] constexpr bool ends_with(char Suffix) const {
+        return !empty() && back() == Suffix;
+    }
+
+    /// you should handle template types and you format string carefully to
+    /// avoid ub
+    template <IsIntegralPtr... ArgTys>
+    void sscan(StringRef format, ArgTys... Args) const {
+
+        // expect Args to be a pack of ptrs
+        std::sscanf(data(), format.Data, Args...);
     }
 };
 

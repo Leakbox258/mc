@@ -76,7 +76,7 @@ class SmallVectorBase {
     static void* replaceAllocation(void* NewElems, std::size_t TSize,
                                    std::size_t NewCapacity,
                                    std::size_t VSize = 0) {
-        void* NewElemsReplace = utils::mem::malloc(NewCapacity * TSize);
+        void* NewElemsReplace = utils::malloc(NewCapacity * TSize);
         if (VSize) {
             std::memcpy(NewElemsReplace, NewElems, VSize * TSize);
         }
@@ -127,7 +127,7 @@ void SmallVectorBase::grow_pod(void* FirstElem, std::size_t MinSize,
     size_t NewCapacity = getNewCapacity(MinSize, TSize, this->capacity());
     void* NewElems;
     if (this->BeginWith == FirstElem) {
-        NewElems = utils::mem::malloc(NewCapacity * TSize);
+        NewElems = utils::malloc(NewCapacity * TSize);
         if (NewElems == FirstElem) {
             NewElems = replaceAllocation(NewElems, TSize, NewCapacity);
         }
@@ -136,7 +136,7 @@ void SmallVectorBase::grow_pod(void* FirstElem, std::size_t MinSize,
         std::memcpy(NewElems, this->BeginWith, size() * TSize);
     } else {
         // If this wasn't grown from the inline copy, grow the allocated space.
-        NewElems = utils::mem::realloc(this->BeginWith, NewCapacity * TSize);
+        NewElems = utils::realloc(this->BeginWith, NewCapacity * TSize);
         if (NewElems == FirstElem) {
             NewElems = replaceAllocation(NewElems, TSize, NewCapacity, size());
         }
@@ -361,7 +361,7 @@ class SmallVectorTemplateBase : public SmallVectorTemplateCommon<T> {
     static constexpr bool TakesParamByValue = false; // non-trivial
     using ValueParamT = const T&;
 
-    SmallVectorTemplateBase(size_t _Size)
+    SmallVectorTemplateBase(std::size_t _Size)
         : SmallVectorTemplateCommon<T>(_Size) {}
 
     /// non-trivial need explicity destructions

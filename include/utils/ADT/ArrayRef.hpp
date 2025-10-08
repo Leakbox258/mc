@@ -14,11 +14,11 @@
 namespace utils {
 namespace ADT {
 
-template <typename Ty, typename ADTViewTy>
+template <typename Ty, typename ADTViewTy> // ADTViewTy = usually a ptr
 concept ViewType =
     std::is_integral_v<decltype(std::declval<const Ty&>().size())> &&
     std::is_convertible_v<decltype(std::declval<const Ty&>().data())*,
-                          const ADTViewTy* const*>;
+                          const ADTViewTy*>;
 
 template <typename T> class ArrayRef {
   public:
