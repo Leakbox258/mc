@@ -163,10 +163,16 @@ class StringRef {
 
     template <std::size_t N>
     constexpr std::array<StringRef, N> split(char splitor) const {
+
+        if (this->empty()) {
+            return {};
+        }
+
         char const* current = this->data();
         char const* last = current;
 
         std::array<StringRef, N> elements{};
+
         unsigned cnt = 0;
         while (*current != '\0') {
 

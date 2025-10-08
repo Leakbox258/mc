@@ -6,7 +6,7 @@
 #include "utils/ADT/SmallVector.hpp"
 #include "utils/macro.hpp"
 #include "utils/source.hpp"
-#include <cstdint>
+
 namespace mc {
 
 class MCInst {
