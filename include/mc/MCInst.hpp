@@ -9,16 +9,18 @@
 
 namespace mc {
 
+using Location = utils::Location;
+
 class MCInst {
   private:
     MCOpCode OpCode;
 
-    utils::Location Loc;
-    utils::ADT::SmallVector<MCOperand, 6> Operands;
+    Location Loc;
+    SmallVector<MCOperand, 6> Operands;
 
   public:
     MCInst() = delete;
-    explicit MCInst(MCOpCode _OpCode, utils::Location _Loc)
+    explicit MCInst(MCOpCode _OpCode, Location _Loc)
         : OpCode(_OpCode), Loc(_Loc), Operands(6) {}
 
     [[nodiscard]] decltype(Operands)::size_ty getOpSize() const {

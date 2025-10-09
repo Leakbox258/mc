@@ -1,5 +1,5 @@
 cmake_minimum_required(3.20)
-project(mc_linker)
+project(mc)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS on)
 set(CMAKE_CXX_STANDARD 2C CACHE STRING "C++ 

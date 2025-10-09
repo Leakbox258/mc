@@ -11,6 +11,7 @@
 #include <cstdio>
 #include <cstring>
 #include <iterator>
+#include <ostream>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -159,6 +160,12 @@ class StringRef {
     [[nodiscard]] char operator[](std::size_t index) const {
         assert(index < this->size());
         return data()[index];
+    }
+
+    friend std::ostream& operator<<(std::ostream& os LIFETIME_BOUND,
+                                    const StringRef& Str) {
+        os << Str.str();
+        return os;
     }
 
     template <std::size_t N>

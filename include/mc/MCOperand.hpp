@@ -75,6 +75,8 @@ class MCOperand {
         utils_assert(isInst(), "not a sub-instruction");
         return Inst;
     }
+
+    /// TODO: dump / verify
 };
 } // namespace mc
 
