@@ -2,11 +2,13 @@
 #define MC_CONTEXT
 
 #include "utils/ADT/StringMap.hpp"
+#include "utils/ADT/StringRef.hpp"
 #include "utils/ADT/StringSet.hpp"
 #include <cstddef>
 #include <elf.h>
 #include <vector>
 namespace mc {
+using StringRef = utils::ADT::StringRef;
 template <typename V> using StringMap = utils::ADT::StringMap<V>;
 using StringSet = utils::ADT::StringSet<>;
 
@@ -22,7 +24,7 @@ class MCContext {
     Elf64_Ehdr Elf_Ehdr;
 
     /// .text
-    size_ty TextSize = 0;
+    size_ty TextOffset = 0;
     StringMap<size_ty> TextSymbols;
 
     /// .rela.text
@@ -63,6 +65,17 @@ class MCContext {
     size_ty Gen_Section_Hdr_Tab();
 
   public:
+    bool addTextSym(StringRef Str, size_ty offset) {
+        return this->TextSymbols.insert(Str, std::move(offset));
+    }
+
+    bool addReloSym(StringRef Str) { return this->ReloSymbols.insert(Str); }
+
+    bool getTextOffset() const { return TextOffset; }
+
+    size_ty incTextOffset(bool IsCompressed = false) {
+        return IsCompressed ? TextOffset += 2 : TextOffset += 4;
+    }
 };
 } // namespace mc
 

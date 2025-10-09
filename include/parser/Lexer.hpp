@@ -36,8 +36,8 @@ std::string to_string(TokenType type);
 struct Token {
     TokenType type;
     StringRef lexeme;
-    size_t line;
-    size_t col;
+    std::size_t line;
+    std::size_t col;
 
     void print() const;
 };
@@ -50,9 +50,9 @@ class Lexer {
 
   private:
     StringRef m_source;
-    size_t m_cursor = 0;
-    size_t m_line = 1;
-    size_t m_col = 1;
+    std::size_t m_cursor = 0;
+    std::size_t m_line = 1;
+    std::size_t m_col = 1;
 
     bool isAtEnd() const;
     char advance();

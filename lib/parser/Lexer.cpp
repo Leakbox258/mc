@@ -1,18 +1,9 @@
 #include "parser/Lexer.hpp"
 #include "mc/MCOpCode.hpp"
+#include "mc/MCOperand.hpp"
 #include <cctype>
-#include <unordered_set>
 
 using namespace parser;
-
-const std::unordered_set<std::string> Registers = {
-    "zero", "ra",  "sp",  "gp",  "tp",  "t0",  "t1",  "t2",  "fp",  "s0",
-    "s1",   "a0",  "a1",  "a2",  "a3",  "a4",  "a5",  "a6",  "a7",  "s2",
-    "s3",   "s4",  "s5",  "s6",  "s7",  "s8",  "s9",  "s10", "s11", "t3",
-    "t4",   "t5",  "t6",  "x0",  "x1",  "x2",  "x3",  "x4",  "x5",  "x6",
-    "x7",   "x8",  "x9",  "x10", "x11", "x12", "x13", "x14", "x15", "x16",
-    "x17",  "x18", "x19", "x20", "x21", "x22", "x23", "x24", "x25", "x26",
-    "x27",  "x28", "x29", "x30", "x31"};
 
 std::string to_string(TokenType type) {
     switch (type) {
@@ -128,7 +119,7 @@ Token Lexer::scanIdentifier() {
     if (MnemonicContain(lexeme.c_str())) {
         return makeToken(TokenType::INSTRUCTION, lexeme);
     }
-    if (Registers.count(lexeme.str())) {
+    if (mc::Registers.find(lexeme.str())) {
         return makeToken(TokenType::REGISTER, lexeme);
     }
 

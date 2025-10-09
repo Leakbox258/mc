@@ -7,6 +7,7 @@
 #include "utils/memory.hpp"
 #include <cstdlib>
 #include <cstring>
+#include <initializer_list>
 #include <map>
 
 namespace {
@@ -158,6 +159,15 @@ class StringMap : StringMapImpl<V, SL, SB> {
     StringMap(const StringMap& map) : Impl(map), Size(map.Size) {}
     StringMap(StringMap&& map) : Impl(std::move(map)), Size(map.Size) {}
 
+    StringMap(std::initializer_list<std::pair<StringRef, V>>&& list)
+        : StringMap() {
+
+        for (auto& [Str, Val] : list) {
+            utils_assert(!this->insert(Str, Val),
+                         "StringRef Key is conflicted");
+        }
+    }
+
     StringMap& operator=(StringMap&& map) {
         if (utils::is_likely(this != &map)) {
             Impl::operator=(std::move(map));
@@ -180,7 +190,7 @@ class StringMap : StringMapImpl<V, SL, SB> {
         size_ty KeyLength = Key.size();
         if (is_likely(KeyLength < SL)) {
             for (const auto& Entry : this->SmallSizeTyTable[KeyLength]) {
-                if (Entry.getEntry() == Key) {
+                if (is_unlikely(Entry.getEntry()) == Key) {
                     return false;
                 }
             }
@@ -191,7 +201,7 @@ class StringMap : StringMapImpl<V, SL, SB> {
         } else {
             auto& Table = this->LargeSizeTyTable[KeyLength];
             for (const auto& Entry : Table) {
-                if (Entry.getEntry() == Key) {
+                if (is_unlikely(Entry.getEntry()) == Key) {
                     return false;
                 }
             }
@@ -201,7 +211,56 @@ class StringMap : StringMapImpl<V, SL, SB> {
         }
     }
 
+    bool insert(StringRef Key, const V& Val) {
+        size_ty KeyLength = Key.size();
+        if (is_likely(KeyLength < SL)) {
+            for (const auto& Entry : this->SmallSizeTyTable[KeyLength]) {
+                if (is_unlikely(Entry.getEntry()) == Key) {
+                    return false;
+                }
+            }
+            this->SmallSizeTyTable[KeyLength].emplace_back(
+                Key, std::forward<V>(Val));
+            Size++;
+            return true;
+        } else {
+            auto& Table = this->LargeSizeTyTable[KeyLength];
+            for (const auto& Entry : Table) {
+                if (is_unlikely(Entry.getEntry()) == Key) {
+                    return false;
+                }
+            }
+            Table.emplace_back(Key, std::forward<V>(Val));
+            Size++;
+            return true;
+        }
+    }
+
+    /// you can trait this as some kind of iter
     V* find(StringRef Key) {
+        size_ty KeyLength = Key.size();
+        if (is_likely(KeyLength) < SL) {
+            for (auto& Entry : this->SmallSizeTyTable[KeyLength]) {
+                if (Entry.getEntry() == Key) {
+                    return Entry.ValuePtr;
+                }
+            }
+            return nullptr;
+        } else {
+            auto It = this->LargeSizeTyTable.find(KeyLength);
+            if (It == this->LargeSizeTyTable.end()) {
+                return nullptr;
+            }
+            for (auto& Entry : It->second) {
+                if (Entry.getEntry() == Key) {
+                    return Entry.ValuePtr;
+                }
+            }
+            return nullptr;
+        }
+    }
+
+    const V* find(StringRef Key) const {
         size_ty KeyLength = Key.size();
         if (is_likely(KeyLength) < SL) {
             for (auto& Entry : this->SmallSizeTyTable[KeyLength]) {

@@ -244,8 +244,6 @@ struct MCOpCode {
     inline constexpr char name##_Pattern_[] = #pattern;                        \
     static constexpr MCOpCode name{name##_, name##_Pattern_};
 
-#define MNEMNOIC(name) processMnemonic(#name)
-
 #define DOIT(name, pattern) ASM(name, pattern)
 #include "RISCV.def"
 #undef DOIT
@@ -254,15 +252,19 @@ struct MCOpCode {
 
 namespace parser {
 
+#define MNEMNOIC(name) processMnemonic(#name)
+
+/// NOTE: tuple<pair<array<N>, MCOpCode*>, ...>
 /// NOTE: avoid using std::make_tuple(), because of tailing comma
-#define DOIT(name, pattern) MNEMNOIC(name),
-constexpr auto MnemonicSet = std::tuple{
+#define DOIT(name, pattern) std::make_pair(MNEMNOIC(name), &mc::name),
+constexpr inline auto MnemonicMap = std::tuple{
 #include "RISCV.def"
 };
 #undef DOIT
 
 template <size_t N>
-constexpr bool MnemonicFind(const std::array<char, N>& arr, const char* c_str) {
+constexpr bool MnemonicContainImpl(const std::array<char, N>& arr,
+                                   const char* c_str) {
     for (size_t i = 0; i < N; ++i) {
         if (arr[i] != c_str[i])
             return false;
@@ -274,13 +276,24 @@ constexpr bool MnemonicFind(const std::array<char, N>& arr, const char* c_str) {
 
 template <size_t I = 0, typename T>
 constexpr bool MnemonicContain(const T& value) {
-    if constexpr (I < std::tuple_size_v<decltype(MnemonicSet)>) {
-        if (MnemonicFind(std::get<I>(MnemonicSet), value)) {
+    if constexpr (I < std::tuple_size_v<decltype(MnemonicMap)>) {
+        if (MnemonicContainImpl(std::get<I>(MnemonicMap).first, value)) {
             return true;
         }
         return MnemonicContain<I + 1>(value);
     }
     return false;
+}
+
+template <size_t I = 0, typename T>
+constexpr const mc::MCOpCode* MnemonicFind(const T& value) {
+    if constexpr (I < std::tuple_size_v<decltype(MnemonicMap)>) {
+        if (MnemonicContainImpl(std::get<I>(MnemonicMap).first, value)) {
+            return std::get<I>(MnemonicMap).second;
+        }
+        return MnemonicFind<I + 1>(value);
+    }
+    return nullptr;
 }
 
 } // namespace parser
