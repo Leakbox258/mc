@@ -4,11 +4,11 @@
 /// TODO: SourceMgr, Dump
 
 #include "ADT/StringRef.hpp"
+#include <cstddef>
 namespace utils {
 
 struct Location {
-    ADT::StringRef filename;
-    unsigned line, col;
+    std::size_t line, col;
 };
 
 } // namespace utils

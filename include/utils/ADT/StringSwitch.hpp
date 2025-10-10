@@ -92,6 +92,8 @@ template <typename T> class StringSwitch {
 
         return fn(Str);
     }
+
+    constexpr T Default() { return std::move(*Result); }
 };
 
 } // namespace ADT

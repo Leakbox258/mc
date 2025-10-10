@@ -4,7 +4,7 @@
 #include <functional>
 namespace utils {
 
-template <typename T, bool LeftBounded, bool RightBounded>
+template <typename T, bool LeftBounded = true, bool RightBounded = false>
 inline bool in_interval(T left, T right, T val) {
 
     std::less<T> LessThan;
@@ -25,9 +25,48 @@ inline bool in_interval(T left, T right, T val) {
     return false;
 }
 
-template <typename T> inline bool in_interval_t(T left, T right, T val) {
+template <typename T, typename... Args>
+inline bool in_set(T Value, const Args&... Enum) {
+    static_assert(sizeof...(Args) != 0, "At least provide one Enum value");
 
-    return in_interval<T, true, false>(left, right, val);
+    return ((Value == Enum) || ...);
+}
+
+template <typename Tx, typename Ty, typename Tuple, std::size_t... I>
+Ty in_set_map_impl(Tx value, const Tuple& tuple, std::index_sequence<I...>) {
+    Ty result = static_cast<Ty>(0);
+
+    (void)((value == std::get<2 * I>(tuple)
+                ? (result = std::get<2 * I + 1>(tuple), true)
+                : true) &&
+           ...);
+
+    return result;
+}
+
+template <typename Tx, typename Ty, typename... Args>
+inline Ty in_set_map(Tx value, Args&&... Enums) { /* Tx, Ty, Tx, Ty... */
+    static_assert(sizeof...(Args) != 0 && sizeof...(Args) % 2 == 0,
+                  "Must provide even number of arguments");
+
+    auto tuple = std::make_tuple(std::forward<Args>(Enums)...);
+    constexpr std::size_t N = sizeof...(Args);
+
+    return in_set_map_impl<Tx, Ty>(value, tuple,
+                                   std::make_index_sequence<N / 2>{});
+}
+
+template <typename Tuple, std::size_t... I>
+bool pairs_equal_impl(const Tuple& tuple, std::index_sequence<I...>) {
+    return ((std::get<2 * I>(tuple) == std::get<2 * I + 1>(tuple)) && ...);
+}
+
+template <typename... Args> inline bool pairs_equal(Args&&... args) {
+    static_assert(sizeof...(Args) != 0 && sizeof...(Args) % 2 == 0,
+                  "Must provide even number of arguments");
+    auto tuple = std::make_tuple(std::forward<Args>(args)...);
+    constexpr std::size_t N = sizeof...(Args);
+    return pairs_equal_impl(tuple, std::make_index_sequence<N / 2>{});
 }
 
 template <typename R>

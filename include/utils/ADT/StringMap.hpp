@@ -11,6 +11,9 @@
 #include <map>
 
 namespace {
+/// TODO: when sizeof(ValueTy) is small but amount is huge, considering use
+/// consist memory instead of malloc
+/// maybe try bump pointer
 template <typename ValueTy> class StringMapEntry {
   public:
     using size_ty = std::size_t;

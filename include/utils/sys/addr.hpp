@@ -1,7 +1,7 @@
 #ifndef UTILS_SYS_ADDR
 #define UTILS_SYS_ADDR
 
-#include "utils/numeric.hpp"
+#include "utils/misc.hpp"
 #include <cassert>
 #include <cstddef>
 #include <filesystem>
@@ -97,12 +97,12 @@ struct VMMapInfo {
     };
 
     Segment check(void* addr) const {
-        if (in_interval_t(this->HeapBegin, this->HeapEnd,
-                          reinterpret_cast<std::size_t>(addr))) {
+        if (in_interval(this->HeapBegin, this->HeapEnd,
+                        reinterpret_cast<std::size_t>(addr))) {
             return Segment::Heap;
         }
-        if (in_interval_t(this->MaxStackTop, this->StackEnd,
-                          reinterpret_cast<std::size_t>(addr))) {
+        if (in_interval(this->MaxStackTop, this->StackEnd,
+                        reinterpret_cast<std::size_t>(addr))) {
             return Segment::Stack;
         }
 

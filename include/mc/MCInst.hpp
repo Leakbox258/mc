@@ -6,22 +6,33 @@
 #include "utils/ADT/SmallVector.hpp"
 #include "utils/macro.hpp"
 #include "utils/source.hpp"
+#include <cstddef>
 
 namespace mc {
 
 using Location = utils::Location;
 
 class MCInst {
+  public:
+    using size_ty = std::size_t;
+
   private:
     const MCOpCode* OpCode; // MCOpCode will all be static and constepxr
 
     Location Loc;
+    size_ty Offset; // offset from the begin of .text
     SmallVector<MCOperand, 6> Operands;
 
   public:
     MCInst() = delete;
-    explicit MCInst(MCOpCode* _OpCode LIFETIME_BOUND, Location _Loc)
-        : OpCode(_OpCode), Loc(_Loc), Operands(6) {}
+    explicit MCInst(MCOpCode* _OpCode LIFETIME_BOUND, Location _Loc,
+                    size_ty _Offset)
+        : OpCode(_OpCode), Loc(_Loc), Offset(_Offset), Operands(6) {}
+
+    explicit MCInst(const StringRef& _OpCode LIFETIME_BOUND, Location _Loc,
+                    size_ty _Offset)
+        : OpCode(parser::MnemonicFind(_OpCode.c_str())), Loc(_Loc),
+          Offset(_Offset), Operands(6) {}
 
     [[nodiscard]] decltype(Operands)::size_ty getOpSize() const {
         return Operands.size();
@@ -50,6 +61,10 @@ class MCInst {
                      "random access to uninitialized memery");
         return Operands[Idx];
     }
+
+    bool isCompressed() const { return OpCode->name.begin_with("c."); }
+
+    size_ty getOffset() const { return Offset; }
 
     using const_iter = decltype(Operands)::const_iter;
     using const_rev_iter = decltype(Operands)::const_rev_iter;

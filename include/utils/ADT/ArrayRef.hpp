@@ -4,7 +4,7 @@
 #include "SmallVector.hpp"
 #include "iterator_range.hpp"
 #include "utils/macro.hpp"
-#include "utils/numeric.hpp"
+#include "utils/misc.hpp"
 #include <cassert>
 #include <cstddef>
 #include <initializer_list>

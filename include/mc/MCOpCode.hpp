@@ -4,7 +4,7 @@
 #include "utils/ADT/SmallVector.hpp"
 #include "utils/ADT/StringRef.hpp"
 #include "utils/ADT/StringSwitch.hpp"
-#include "utils/numeric.hpp"
+#include "utils/misc.hpp"
 #include <cstdint>
 #include <optional>
 #include <tuple>
@@ -252,11 +252,11 @@ struct MCOpCode {
 
 namespace parser {
 
-#define MNEMNOIC(name) processMnemonic(#name)
+#define MNEMONIC(name) processMnemonic(#name)
 
 /// NOTE: tuple<pair<array<N>, MCOpCode*>, ...>
 /// NOTE: avoid using std::make_tuple(), because of tailing comma
-#define DOIT(name, pattern) std::make_pair(MNEMNOIC(name), &mc::name),
+#define DOIT(name, pattern) std::make_pair(MNEMONIC(name), &mc::name),
 constexpr inline auto MnemonicMap = std::tuple{
 #include "RISCV.def"
 };

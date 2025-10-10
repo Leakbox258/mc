@@ -1,6 +1,7 @@
 #ifndef PARSER_LEXER
 #define PARSER_LEXER
 
+#include "mc/MCInst.hpp"
 #include "utils/ADT/StringRef.hpp"
 #include <string>
 
@@ -12,9 +13,10 @@ enum class TokenType {
     END_OF_FILE,
     NEWLINE,
 
-    IDENTIFIER,  // e.g., my_label (when used as an operand)
+    IDENTIFIER,  // e.g., my_label (when used as an operand in an inst)
     INTEGER,     // e.g., 123, -42
     HEX_INTEGER, // e.g., 0xdeadbeef
+    FLOAT,       // e.g., 1.5
 
     INSTRUCTION, // e.g., addi, lw, sd
     REGISTER,    // e.g., a0, sp, x10
@@ -27,7 +29,6 @@ enum class TokenType {
     RPAREN, // )
     COLON,  // :
 
-    COMMENT,       // # ...
     STRING_LITERAL // "..."
 };
 
@@ -35,9 +36,8 @@ std::string to_string(TokenType type);
 
 struct Token {
     TokenType type;
-    StringRef lexeme;
-    std::size_t line;
-    std::size_t col;
+    std::string lexeme;
+    mc::Location loc;
 
     void print() const;
 };

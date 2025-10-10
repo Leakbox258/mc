@@ -3,6 +3,7 @@
 
 #include "utils/ADT/StringMap.hpp"
 #include "utils/macro.hpp"
+#include "utils/memory.hpp"
 #include <cstdint>
 namespace mc {
 
@@ -79,6 +80,48 @@ class MCOperand {
 
   public:
     MCOperand() : DFPImm(0) {}
+
+    static const MCOperand& makeReg(MCReg _Reg) {
+        MCOperand* ptr = (MCOperand*)(utils::malloc(sizeof(MCOperand)));
+        ::new ((void*)(ptr)) MCOperand();
+        ptr->Reg = std::move(_Reg);
+        return *ptr;
+    }
+
+    static const MCOperand& makeImm(int64_t _Imm) {
+        MCOperand* ptr = (MCOperand*)(utils::malloc(sizeof(MCOperand)));
+        ::new ((void*)(ptr)) MCOperand();
+        ptr->Imm = std::move(_Imm);
+        return *ptr;
+    }
+
+    static const MCOperand& makeSFPImm(uint32_t _SFPImm) {
+        MCOperand* ptr = (MCOperand*)(utils::malloc(sizeof(MCOperand)));
+        ::new ((void*)(ptr)) MCOperand();
+        ptr->SFPImm = std::move(_SFPImm);
+        return *ptr;
+    }
+
+    static const MCOperand& makeDFPImm(uint64_t _DFPImm) {
+        MCOperand* ptr = (MCOperand*)(utils::malloc(sizeof(MCOperand)));
+        ::new ((void*)(ptr)) MCOperand();
+        ptr->DFPImm = std::move(_DFPImm);
+        return *ptr;
+    }
+
+    static const MCOperand& makeExpr(const MCExpr* _Expr) {
+        MCOperand* ptr = (MCOperand*)(utils::malloc(sizeof(MCOperand)));
+        ::new ((void*)(ptr)) MCOperand();
+        ptr->Expr = std::move(_Expr);
+        return *ptr;
+    }
+
+    static const MCOperand& makeInst(const MCInst* _Inst) {
+        MCOperand* ptr = (MCOperand*)(utils::malloc(sizeof(MCOperand)));
+        ::new ((void*)(ptr)) MCOperand();
+        ptr->Inst = std::move(_Inst);
+        return *ptr;
+    }
 
     bool isValid() const { return Kind != kInvalid; }
     bool isReg() const { return Kind == kReg; }

@@ -1,7 +1,10 @@
 #include "parser/Lexer.hpp"
 #include "mc/MCOpCode.hpp"
 #include "mc/MCOperand.hpp"
+#include "utils/likehood.hpp"
+#include <algorithm>
 #include <cctype>
+#include <string>
 
 using namespace parser;
 
@@ -19,6 +22,8 @@ std::string to_string(TokenType type) {
         return "INTEGER";
     case TokenType::HEX_INTEGER:
         return "HEX_INTEGER";
+    case TokenType::FLOAT:
+        return "FLOAT";
     case TokenType::INSTRUCTION:
         return "INSTRUCTION";
     case TokenType::REGISTER:
@@ -35,8 +40,6 @@ std::string to_string(TokenType type) {
         return "RPAREN";
     case TokenType::COLON:
         return "COLON";
-    case TokenType::COMMENT:
-        return "COMMENT";
     case TokenType::STRING_LITERAL:
         return "STRING_LITERAL";
     default:
@@ -46,7 +49,7 @@ std::string to_string(TokenType type) {
 
 void Token::print() const {
     std::cout << "Token(" << to_string(type) << ", lexeme: '" << lexeme << "', "
-              << "line: " << line << ", col: " << col << ")\n";
+              << "line: " << loc.line << ", col: " << loc.col << ")\n";
 }
 
 Lexer::Lexer(StringRef source) : m_source(source) {}
@@ -95,11 +98,11 @@ void Lexer::skipWhitespaceAndComments() {
 
 Token Lexer::makeToken(TokenType type) const {
     // For single-character tokens
-    return {type, m_source.slice(m_cursor - 1, 1), m_line, m_col - 1};
+    return {type, m_source.slice(m_cursor - 1, 1).str(), {m_line, m_col - 1}};
 }
 
 Token Lexer::makeToken(TokenType type, StringRef lexeme) const {
-    return {type, lexeme, m_line, m_col - lexeme.size()};
+    return {type, lexeme.str(), {m_line, m_col - lexeme.size()}};
 }
 
 Token Lexer::scanIdentifier() {
@@ -107,7 +110,11 @@ Token Lexer::scanIdentifier() {
     while (isalnum(peek()) || peek() == '_' || peek() == '.') {
         advance();
     }
-    StringRef lexeme = m_source.slice(start, m_cursor - start);
+
+    std::string lexeme = m_source.slice(start, m_cursor - start).str();
+
+    std::transform(lexeme.begin(), lexeme.end(), lexeme.begin(),
+                   [](unsigned char c) { return std::tolower(c); });
 
     // Check if it's a label definition
     if (peek() == ':') {
@@ -119,7 +126,7 @@ Token Lexer::scanIdentifier() {
     if (MnemonicContain(lexeme.c_str())) {
         return makeToken(TokenType::INSTRUCTION, lexeme);
     }
-    if (mc::Registers.find(lexeme.str())) {
+    if (mc::Registers.find(lexeme)) {
         return makeToken(TokenType::REGISTER, lexeme);
     }
 
@@ -146,10 +153,17 @@ Token Lexer::scanNumber() {
     }
 
     // Decimal
-    while (isdigit(peek())) {
+    bool dot = false;
+    while (isdigit(peek()) || !dot) {
+
+        if (utils::is_unlikely(peek() == '.')) {
+            dot = true;
+        }
+
         advance();
     }
-    return makeToken(TokenType::INTEGER,
+
+    return makeToken(dot ? TokenType::FLOAT : TokenType::INTEGER,
                      m_source.slice(start, m_cursor - start));
 }
 
@@ -176,7 +190,7 @@ Token Lexer::nextToken() {
     skipWhitespaceAndComments();
 
     if (isAtEnd()) {
-        return {TokenType::END_OF_FILE, "", m_line, m_col};
+        return {TokenType::END_OF_FILE, "", {m_line, m_col}};
     }
 
     char c = advance();
