@@ -2,6 +2,7 @@
 #define UTILS_ADT_STRINGSWITCH
 
 #include "StringRef.hpp"
+#include "utils/logger.hpp"
 #include <algorithm>
 #include <optional>
 namespace utils {
@@ -94,6 +95,14 @@ template <typename T> class StringSwitch {
     }
 
     constexpr T Default() { return std::move(*Result); }
+
+    T Error() {
+        if (!Result) {
+            utils::unreachable("StringSwitch::Error: unreachable condicate");
+        }
+
+        return std::move(*Result);
+    }
 };
 
 } // namespace ADT

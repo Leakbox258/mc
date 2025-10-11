@@ -1,7 +1,10 @@
 #ifndef UTILS_NUMERIC
 #define UTILS_NUMERIC
 
+#include <cstddef>
+#include <cstdint>
 #include <functional>
+#include <optional>
 namespace utils {
 
 template <typename T, bool LeftBounded = true, bool RightBounded = false>
@@ -123,6 +126,68 @@ constexpr inline int stoi(const char* str, std::size_t len, int base = 10) {
 
     return is_negative ? -result : result;
 }
+
+inline int popcounter_wrapper(unsigned short vic) {
+    return __builtin_popcount(static_cast<unsigned>(vic));
+}
+
+inline int popcounter_wrapper(unsigned vic) { return __builtin_popcount(vic); }
+
+inline int popcounter_wrapper(int vic) { return __builtin_popcount(vic); }
+
+inline int popcounter_wrapper(unsigned long long vic) {
+    return __builtin_popcountll(vic);
+}
+
+inline int popcounter_wrapper(uint64_t vic) {
+    return __builtin_popcountll(vic);
+}
+
+inline int clz_wrapper(unsigned short vic) {
+#if defined(__clang__)
+    return vic ? __builtin_clzs(vic) : 16;
+#else
+    return vic ? __builtin_ctz((unsigned int)vic) : 16;
+#endif
+}
+
+inline int ctz_wrapper(unsigned short vic) {
+#if defined(__clang__)
+    return vic ? __builtin_ctzs(vic) : 0;
+#else
+    return vic ? __builtin_ctz((unsigned int)vic) : 0;
+#endif
+}
+
+inline int clz_wrapper(unsigned vic) { return vic ? __builtin_clz(vic) : 32; }
+
+inline int ctz_wrapper(unsigned vic) { return vic ? __builtin_ctz(vic) : 0; }
+
+inline int clz_wrapper(int vic) { return vic ? __builtin_clz(vic) : 32; }
+
+inline int ctz_wrapper(int vic) { return vic ? __builtin_ctz(vic) : 0; }
+
+inline int clz_wrapper(unsigned long long vic) {
+    return vic ? __builtin_clzll(vic) : 64;
+}
+
+inline int ctz_wrapper(unsigned long long vic) {
+    return vic ? __builtin_ctzll(vic) : 0;
+}
+
+inline int clz_wrapper(uint64_t vic) { return vic ? __builtin_ctzll(vic) : 64; }
+
+inline int ctz_wrapper(uint64_t vic) { return vic ? __builtin_ctzll(vic) : 0; }
+
+inline std::optional<int> log2(std::size_t Value) {
+    if (popcounter_wrapper(Value) != 1) {
+        return std::nullopt;
+    } else {
+        return clz_wrapper(Value);
+    }
+}
+
+inline std::size_t pow2i(std::size_t x) { return __builtin_powi(x, 2); }
 
 } // namespace utils
 

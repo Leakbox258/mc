@@ -92,6 +92,7 @@ class MCContext {
     ByteStream<> DataBuffer;
 
     /// .bss
+    size_ty BssSize;
 
     /// .symtab
     std::vector<Elf64_Sym> Elf_Syms;
@@ -129,6 +130,10 @@ class MCContext {
     }
 
   public:
+    bool addTextSym(StringRef Str) {
+        return this->TextLabels.insert(Str, TextOffset);
+    }
+
     bool addTextSym(StringRef Str, size_ty offset) {
         return this->TextLabels.insert(Str, std::move(offset));
     }
@@ -158,6 +163,17 @@ class MCContext {
     template <size_ty N> size_ty pushDataBuf(char (&Value)[N]) {
         this->DataBuffer << std::forward<decltype(Value)>(Value);
         return this->DataBuffer.size();
+    }
+
+    size_ty makeDataBufAlign(size_ty balign) {
+        this->DataBuffer.balignTo(balign);
+        return this->DataBuffer.size();
+    }
+
+    size_ty pushBssBuf(size_ty size) { return this->BssSize += size; }
+
+    size_ty makeBssBufAlign(size_ty balign) {
+        return this->BssSize += (balign - this->BssSize % balign) % balign;
     }
 };
 } // namespace mc

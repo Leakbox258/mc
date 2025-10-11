@@ -83,15 +83,93 @@ void Parser::parse() {
             JmpBrHelper(token.lexeme);
             advance();
             break;
-        case TokenType::INTEGER:
+        case TokenType::INTEGER: {
+            auto dw = std::stoll(token.lexeme);
             if (curInst) {
-                curInst->addOperand(
-                    MCOperand::makeImm(std::stoll(token.lexeme)));
+                curInst->addOperand(MCOperand::makeImm(dw));
             } else {
-                /// TODO: check directive
-                utils_assert(utils::in_set(DirectiveStack.back(), "."),
-                             "expecting data def directive");
+                /// TODO: more directive
+
+                if (DirectiveStack[DirectiveStack.size() - 2] == ".data") {
+                    StringSwitch<bool>(DirectiveStack.back())
+                        .Case(".half",
+                              [&](auto&& _) {
+                                  ctx.pushDataBuf<uint16_t>(dw);
+                                  return true;
+                              })
+                        .Case(".word",
+                              [&](auto&& _) {
+                                  ctx.pushDataBuf<uint32_t>(dw);
+                                  return true;
+                              })
+                        .Case(".dword",
+                              [&](auto&& _) {
+                                  ctx.pushDataBuf<uint64_t>(dw);
+                                  return true;
+                              })
+                        .Case(".align",
+                              [&](auto&& _) {
+                                  utils_assert(dw < 16,
+                                               "expectling align target to be "
+                                               "small than 16");
+
+                                  ctx.makeDataBufAlign(utils::pow2i(dw));
+
+                                  return true;
+                              })
+                        .Case(".balign",
+                              [&](auto&& _) {
+                                  auto e = utils::log2(dw);
+                                  utils_assert(e,
+                                               "expecting dw to be pow of 2");
+
+                                  ctx.makeDataBufAlign(dw);
+                                  return true;
+                              })
+                        .Error();
+
+                    DirectiveStack.pop_back();
+
+                } else if (DirectiveStack[DirectiveStack.size() - 2] ==
+                           ".bss") {
+                    utils_assert(dw == 0,
+                                 "data def in bss supposed to be all zero");
+
+                    StringSwitch<bool>(DirectiveStack.back())
+                        .Case(".zero",
+                              [&](auto&& _) {
+                                  ctx.pushBssBuf(dw);
+                                  return true;
+                              })
+                        .Case(".align",
+                              [&](auto&& _) {
+                                  utils_assert(dw < 16,
+                                               "expectling align target to be "
+                                               "small than 16");
+
+                                  ctx.makeBssBufAlign(utils::pow2i(dw));
+
+                                  return true;
+                              })
+                        .Case(".balign",
+                              [&](auto&& _) {
+                                  auto e = utils::log2(dw);
+                                  utils_assert(e,
+                                               "expecting dw to be pow of 2");
+
+                                  ctx.makeBssBufAlign(dw);
+                                  return true;
+                              })
+                        .Error();
+
+                    DirectiveStack.pop_back();
+
+                } else {
+                    utils::unreachable(
+                        "expect literal in .data or .bss section");
+                }
             }
+        }
             advance();
             break;
         case TokenType::HEX_INTEGER:
@@ -107,34 +185,34 @@ void Parser::parse() {
                 auto [fimm, isDouble] =
                     StringSwitch<std::tuple<uint64_t, bool>>(
                         DirectiveStack.back())
-                        .BeginWith(
-                            ".float",
-                            [](auto&& Str) -> std::tuple<uint64_t, bool> {
-                                float value;
-                                auto [ptr, ec] = std::from_chars(
-                                    Str.data(), Str.data() + Str.size(), value);
+                        .Case(".float",
+                              [](auto&& Str) -> std::tuple<uint64_t, bool> {
+                                  float value;
+                                  auto [ptr, ec] = std::from_chars(
+                                      Str.data(), Str.data() + Str.size(),
+                                      value);
 
-                                utils_assert(ec == std::error_code{},
-                                             "parse float point failed");
+                                  utils_assert(ec == std::error_code{},
+                                               "parse float point failed");
 
-                                return std::make_tuple(
-                                    *reinterpret_cast<uint64_t*>(&value),
-                                    false);
-                            })
-                        .BeginWith(
-                            ".double",
-                            [](auto&& Str) -> std::tuple<uint64_t, bool> {
-                                double value;
-                                auto [ptr, ec] = std::from_chars(
-                                    Str.data(), Str.data() + Str.size(), value);
+                                  return std::make_tuple(
+                                      *reinterpret_cast<uint64_t*>(&value),
+                                      false);
+                              })
+                        .Case(".double",
+                              [](auto&& Str) -> std::tuple<uint64_t, bool> {
+                                  double value;
+                                  auto [ptr, ec] = std::from_chars(
+                                      Str.data(), Str.data() + Str.size(),
+                                      value);
 
-                                utils_assert(ec == std::error_code{},
-                                             "parse float point failed");
+                                  utils_assert(ec == std::error_code{},
+                                               "parse float point failed");
 
-                                return std::make_tuple(
-                                    *reinterpret_cast<uint64_t*>(&value),
-                                    false);
-                            })
+                                  return std::make_tuple(
+                                      *reinterpret_cast<uint64_t*>(&value),
+                                      false);
+                              })
                         .Default();
 
                 if (isDouble) {
@@ -162,10 +240,30 @@ void Parser::parse() {
         case TokenType::LABEL_DEFINITION:
             /// TODO: if in .text
             /// TODO: else, check if in .global/.globl
+
+            if (DirectiveStack.back() == ".text") {
+                ctx.addTextSym(token.lexeme);
+            } else {
+                auto isExist =
+                    !StringSwitch<bool>(DirectiveStack.back())
+                         .Case(".global",
+                               [&](auto&& _) {
+                                   return ctx.addReloSym(token.lexeme);
+                               })
+                         .Case(".globl",
+                               [&](auto&& _) {
+                                   return ctx.addReloSym(token.lexeme);
+                               })
+                         .Error();
+
+                utils_assert(!isExist, "global symbol redefinition");
+
+                DirectiveStack.pop_back();
+            }
             advance();
             break;
         case TokenType::STRING_LITERAL:
-            advance();
+            utils::todo("sting def pesudo not impl yet");
             break;
         default:
             utils::unreachable("unkwnow type of current token");

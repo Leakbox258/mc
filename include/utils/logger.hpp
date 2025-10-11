@@ -64,6 +64,19 @@ void info(std::string_view format_str, Args&&... args) {
     std::unreachable();
 }
 
+[[noreturn]] inline void
+todo(std::string_view message = "NoImplmented code executed",
+     const std::source_location& location = std::source_location::current()) {
+    std::lock_guard<std::mutex> lock(log_mutex);
+    std::cerr << std::format(
+        "[{}] [{}] {}\n"
+        "  -> at {}:{}\n"
+        "  -> in function: {}\n",
+        get_formatted_timestamp(), colorize("TODO", COLOR_RED), message,
+        location.file_name(), location.line(), location.function_name());
+    std::unreachable();
+}
+
 /// assert inner
 inline void assert_handler(bool condition, std::string_view expression,
                            std::string_view message,
@@ -88,6 +101,7 @@ inline void assert_handler(bool condition, std::string_view expression,
 
 using logger::assert_handler;
 using logger::info;
+using logger::todo;
 using logger::unreachable;
 
 } // namespace utils
