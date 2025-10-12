@@ -1,5 +1,6 @@
 #include "parser/Parser.hpp"
 #include "mc/MCContext.hpp"
+#include "mc/MCExpr.hpp"
 #include "mc/MCInst.hpp"
 #include "mc/MCOperand.hpp"
 #include "parser/Lexer.hpp"
@@ -23,250 +24,264 @@ using SmallVector = utils::ADT::SmallVector<T, N>;
 
 void Parser::parse() {
 
-    auto token = this->lexer.nextToken();
-    std::optional<MCInst> curInst = std::nullopt;
-    SmallVector<std::string, 4> DirectiveStack;
-    MCContext::size_ty curOffset = 0;
+  auto token = this->lexer.nextToken();
+  std::optional<MCInst> curInst = std::nullopt;
+  SmallVector<std::string, 4> DirectiveStack;
+  MCContext::size_ty curOffset = 0;
 
-    auto advance = [&]() { token = this->lexer.nextToken(); };
+  auto advance = [&]() { token = this->lexer.nextToken(); };
 
-    auto RegHelper = [&](const StringRef& reg) -> uint8_t {
-        utils_assert(curInst, "expect curInst to be valid");
-        auto find_reg = curInst->isCompressed() ? CRegisters.find(reg)
-                                                : Registers.find(reg);
-        utils_assert(find_reg, "invalid register literal");
-        return *find_reg;
-    };
+  auto RegHelper = [&](const StringRef& reg) -> uint8_t {
+    utils_assert(curInst, "expect curInst to be valid");
+    auto find_reg =
+        curInst->isCompressed() ? CRegisters.find(reg) : Registers.find(reg);
+    utils_assert(find_reg, "invalid register literal");
+    return *find_reg;
+  };
 
-    auto JmpBrHelper = [&](const StringRef& label) {
-        utils_assert(curInst, "expect curInst to be valid");
-        ctx.addReloInst(&(*curInst), label.str());
+  auto JmpBrHelper = [&](const StringRef& label) {
+    utils_assert(curInst, "expect curInst to be valid");
+    ctx.addReloInst(&(*curInst), label.str());
 
-        /// 12 bits offset padding
-        curInst->addOperand(MCOperand::makeImm(0));
-    };
+    /// 12 bits offset padding
+    curInst->addOperand(MCOperand::makeImm(0));
+  };
 
-    while (token.type != TokenType::END_OF_FILE) {
-        utils_assert(token.type != TokenType::UNKNOWN, "Lexer: error");
+  while (token.type != TokenType::END_OF_FILE) {
+    utils_assert(token.type != TokenType::UNKNOWN, "Lexer: error");
 
-        switch (token.type) {
-        case TokenType::NEWLINE:
-            /// Inst commit
-            curOffset = ctx.addTextInst(std::move(*curInst));
-            curInst = std::nullopt;
-            advance();
-            break;
-        case TokenType::COMMA:
-            utils_assert(curInst, "encounter dangling comma");
-            advance();
-            break;
-        case TokenType::LPAREN:
-            utils_assert(curInst, "encounter dangling left paren");
-            advance();
-            utils_assert(token.type == TokenType::REGISTER,
-                         "parse as an expr failed");
-            curInst->addOperand(MCOperand::makeReg(RegHelper(token.lexeme)));
-            advance();
-            utils_assert(token.type == TokenType::RPAREN,
-                         "expecting right paren");
-            advance();
-            break;
-        case TokenType::RPAREN:
-            utils::unreachable("encounter dangling right paren");
-        case TokenType::COLON:
-            advance();
-            break;
-        case TokenType::IDENTIFIER:
-            /// symbol used without modifiers
-            /// this is often branch/jump insts or
-            /// TODO: pseudo instructions
-            JmpBrHelper(token.lexeme);
-            advance();
-            break;
-        case TokenType::INTEGER: {
-            auto dw = std::stoll(token.lexeme);
-            if (curInst) {
-                curInst->addOperand(MCOperand::makeImm(dw));
-            } else {
-                /// TODO: more directive
+    switch (token.type) {
+    case TokenType::NEWLINE:
+      /// Inst commit
+      curOffset = ctx.addTextInst(std::move(*curInst));
+      curInst = std::nullopt;
+      advance();
+      break;
+    case TokenType::COMMA:
+      utils_assert(curInst, "encounter dangling comma");
+      advance();
+      break;
+    case TokenType::LPAREN:
+      utils_assert(curInst, "encounter dangling left paren");
+      advance();
+      utils_assert(token.type == TokenType::REGISTER,
+                   "parse as an expr failed");
+      curInst->addOperand(MCOperand::makeReg(RegHelper(token.lexeme)));
+      advance();
+      utils_assert(token.type == TokenType::RPAREN, "expecting right paren");
+      advance();
+      break;
+    case TokenType::RPAREN:
+      utils::unreachable("encounter dangling right paren");
+    case TokenType::COLON:
+      advance();
+      break;
+    case TokenType::IDENTIFIER:
+      /// symbol used without modifiers
+      /// this is often branch/jump insts or
+      /// TODO: pseudo instructions
+      JmpBrHelper(token.lexeme);
+      advance();
+      break;
+    case TokenType::INTEGER: {
+      auto dw = std::stoll(token.lexeme);
+      if (curInst) {
+        curInst->addOperand(MCOperand::makeImm(dw));
+      } else {
+        /// TODO: more directive
 
-                if (DirectiveStack[DirectiveStack.size() - 2] == ".data") {
-                    StringSwitch<bool>(DirectiveStack.back())
-                        .Case(".half",
-                              [&](auto&& _) {
-                                  ctx.pushDataBuf<uint16_t>(dw);
-                                  return true;
-                              })
-                        .Case(".word",
-                              [&](auto&& _) {
-                                  ctx.pushDataBuf<uint32_t>(dw);
-                                  return true;
-                              })
-                        .Case(".dword",
-                              [&](auto&& _) {
-                                  ctx.pushDataBuf<uint64_t>(dw);
-                                  return true;
-                              })
-                        .Case(".align",
-                              [&](auto&& _) {
-                                  utils_assert(dw < 16,
-                                               "expectling align target to be "
-                                               "small than 16");
+        if (DirectiveStack[DirectiveStack.size() - 2] == ".data") {
+          StringSwitch<bool>(DirectiveStack.back())
+              .Case(".half",
+                    [&](auto&& _) {
+                      ctx.pushDataBuf<uint16_t>(dw);
+                      return true;
+                    })
+              .Case(".word",
+                    [&](auto&& _) {
+                      ctx.pushDataBuf<uint32_t>(dw);
+                      return true;
+                    })
+              .Case(".dword",
+                    [&](auto&& _) {
+                      ctx.pushDataBuf<uint64_t>(dw);
+                      return true;
+                    })
+              .Case(".align",
+                    [&](auto&& _) {
+                      utils_assert(dw < 16, "expectling align target to be "
+                                            "small than 16");
 
-                                  ctx.makeDataBufAlign(utils::pow2i(dw));
+                      ctx.makeDataBufAlign(utils::pow2i(dw));
 
-                                  return true;
-                              })
-                        .Case(".balign",
-                              [&](auto&& _) {
-                                  auto e = utils::log2(dw);
-                                  utils_assert(e,
-                                               "expecting dw to be pow of 2");
+                      return true;
+                    })
+              .Case(".balign",
+                    [&](auto&& _) {
+                      auto e = utils::log2(dw);
+                      utils_assert(e, "expecting dw to be pow of 2");
 
-                                  ctx.makeDataBufAlign(dw);
-                                  return true;
-                              })
-                        .Error();
+                      ctx.makeDataBufAlign(dw);
+                      return true;
+                    })
+              .Error();
 
-                    DirectiveStack.pop_back();
+          DirectiveStack.pop_back();
 
-                } else if (DirectiveStack[DirectiveStack.size() - 2] ==
-                           ".bss") {
-                    utils_assert(dw == 0,
-                                 "data def in bss supposed to be all zero");
+        } else if (DirectiveStack[DirectiveStack.size() - 2] == ".bss") {
+          utils_assert(dw == 0, "data def in bss supposed to be all zero");
 
-                    StringSwitch<bool>(DirectiveStack.back())
-                        .Case(".zero",
-                              [&](auto&& _) {
-                                  ctx.pushBssBuf(dw);
-                                  return true;
-                              })
-                        .Case(".align",
-                              [&](auto&& _) {
-                                  utils_assert(dw < 16,
-                                               "expectling align target to be "
-                                               "small than 16");
+          StringSwitch<bool>(DirectiveStack.back())
+              .Case(".zero",
+                    [&](auto&& _) {
+                      ctx.pushBssBuf(dw);
+                      return true;
+                    })
+              .Case(".align",
+                    [&](auto&& _) {
+                      utils_assert(dw < 16, "expectling align target to be "
+                                            "small than 16");
 
-                                  ctx.makeBssBufAlign(utils::pow2i(dw));
+                      ctx.makeBssBufAlign(utils::pow2i(dw));
 
-                                  return true;
-                              })
-                        .Case(".balign",
-                              [&](auto&& _) {
-                                  auto e = utils::log2(dw);
-                                  utils_assert(e,
-                                               "expecting dw to be pow of 2");
+                      return true;
+                    })
+              .Case(".balign",
+                    [&](auto&& _) {
+                      auto e = utils::log2(dw);
+                      utils_assert(e, "expecting dw to be pow of 2");
 
-                                  ctx.makeBssBufAlign(dw);
-                                  return true;
-                              })
-                        .Error();
+                      ctx.makeBssBufAlign(dw);
+                      return true;
+                    })
+              .Error();
 
-                    DirectiveStack.pop_back();
+          DirectiveStack.pop_back();
 
-                } else {
-                    utils::unreachable(
-                        "expect literal in .data or .bss section");
-                }
-            }
+        } else {
+          utils::unreachable("expect literal in .data or .bss section");
         }
-            advance();
-            break;
-        case TokenType::HEX_INTEGER:
-            curInst->addOperand(
-                MCOperand::makeImm(std::stoll(token.lexeme, nullptr, 16)));
-            advance();
-            break;
-        case TokenType::FLOAT:
-            /// TODO: pseudo instruction
-            {
-                utils_assert(!DirectiveStack.empty(),
-                             "expecting in an directive");
-                auto [fimm, isDouble] =
-                    StringSwitch<std::tuple<uint64_t, bool>>(
-                        DirectiveStack.back())
-                        .Case(".float",
-                              [](auto&& Str) -> std::tuple<uint64_t, bool> {
-                                  float value;
-                                  auto [ptr, ec] = std::from_chars(
-                                      Str.data(), Str.data() + Str.size(),
-                                      value);
-
-                                  utils_assert(ec == std::error_code{},
-                                               "parse float point failed");
-
-                                  return std::make_tuple(
-                                      *reinterpret_cast<uint64_t*>(&value),
-                                      false);
-                              })
-                        .Case(".double",
-                              [](auto&& Str) -> std::tuple<uint64_t, bool> {
-                                  double value;
-                                  auto [ptr, ec] = std::from_chars(
-                                      Str.data(), Str.data() + Str.size(),
-                                      value);
-
-                                  utils_assert(ec == std::error_code{},
-                                               "parse float point failed");
-
-                                  return std::make_tuple(
-                                      *reinterpret_cast<uint64_t*>(&value),
-                                      false);
-                              })
-                        .Default();
-
-                if (isDouble) {
-                    ctx.pushDataBuf(fimm);
-                } else {
-                    ctx.pushDataBuf(static_cast<uint32_t>(fimm));
-                }
-            }
-            advance();
-            break;
-        case TokenType::INSTRUCTION:
-            *curInst = MCInst(token.lexeme, token.loc, curOffset);
-            advance();
-            break;
-        case TokenType::REGISTER:
-            utils_assert(curInst, "expect curInst to be valid");
-            curInst->addOperand(MCOperand::makeReg(RegHelper(token.lexeme)));
-            advance();
-            break;
-        case TokenType::DIRECTIVE:
-            /// TODO: .section
-            DirectiveStack.emplace_back(token.lexeme);
-            advance();
-            break;
-        case TokenType::LABEL_DEFINITION:
-            /// TODO: if in .text
-            /// TODO: else, check if in .global/.globl
-
-            if (DirectiveStack.back() == ".text") {
-                ctx.addTextSym(token.lexeme);
-            } else {
-                auto isExist =
-                    !StringSwitch<bool>(DirectiveStack.back())
-                         .Case(".global",
-                               [&](auto&& _) {
-                                   return ctx.addReloSym(token.lexeme);
-                               })
-                         .Case(".globl",
-                               [&](auto&& _) {
-                                   return ctx.addReloSym(token.lexeme);
-                               })
-                         .Error();
-
-                utils_assert(!isExist, "global symbol redefinition");
-
-                DirectiveStack.pop_back();
-            }
-            advance();
-            break;
-        case TokenType::STRING_LITERAL:
-            utils::todo("sting def pesudo not impl yet");
-            break;
-        default:
-            utils::unreachable("unkwnow type of current token");
-        }
+      }
     }
+      advance();
+      break;
+    case TokenType::HEX_INTEGER:
+      curInst->addOperand(
+          MCOperand::makeImm(std::stoll(token.lexeme, nullptr, 16)));
+      advance();
+      break;
+    case TokenType::FLOAT:
+      /// TODO: pseudo instruction
+      {
+        utils_assert(!DirectiveStack.empty(), "expecting in an directive");
+        auto [fimm, isDouble] =
+            StringSwitch<std::tuple<uint64_t, bool>>(DirectiveStack.back())
+                .Case(".float",
+                      [](auto&& Str) -> std::tuple<uint64_t, bool> {
+                        float value;
+                        auto [ptr, ec] = std::from_chars(
+                            Str.data(), Str.data() + Str.size(), value);
+
+                        utils_assert(ec == std::error_code{},
+                                     "parse float point failed");
+
+                        return std::make_tuple(
+                            *reinterpret_cast<uint64_t*>(&value), false);
+                      })
+                .Case(".double",
+                      [](auto&& Str) -> std::tuple<uint64_t, bool> {
+                        double value;
+                        auto [ptr, ec] = std::from_chars(
+                            Str.data(), Str.data() + Str.size(), value);
+
+                        utils_assert(ec == std::error_code{},
+                                     "parse float point failed");
+
+                        return std::make_tuple(
+                            *reinterpret_cast<uint64_t*>(&value), false);
+                      })
+                .Default();
+
+        if (isDouble) {
+          ctx.pushDataBuf(fimm);
+        } else {
+          ctx.pushDataBuf(static_cast<uint32_t>(fimm));
+        }
+      }
+      advance();
+      break;
+    case TokenType::MODIFIERS: {
+      utils_assert(curInst, "expect curInst to be valid");
+      auto ty = mc::getExprTy(token.lexeme);
+      utils_assert(ty, "invalid modifier");
+      advance();
+      utils_assert(token.type == TokenType::LPAREN,
+                   "expecting left paren after a modifier");
+      auto Symbol = token.lexeme; // IDENTIFIER
+      advance();
+      utils_assert(token.type == TokenType::RPAREN,
+                   "expecting right paren after a modifier");
+
+      curInst->addOperand(MCOperand::makeExpr(ctx.getTextExpr(Symbol, ty)));
+
+      ctx.addReloInst(&(*curInst), Symbol);
+    }
+      advance();
+      break;
+    case TokenType::INSTRUCTION:
+      *curInst = MCInst(token.lexeme, token.loc, curOffset);
+      advance();
+      break;
+    case TokenType::REGISTER:
+      utils_assert(curInst, "expect curInst to be valid");
+      curInst->addOperand(MCOperand::makeReg(RegHelper(token.lexeme)));
+      advance();
+      break;
+    case TokenType::DIRECTIVE:
+      /// TODO: .section
+      {
+        auto isSectionDirective = StringSwitch<bool>(token.lexeme)
+                                      .Case(".data", ".bss", ".text", true)
+                                      .Default(false);
+
+        if (isSectionDirective) {
+          /// end of the last section & start of the new section
+          DirectiveStack.pop_back();
+        }
+
+        DirectiveStack.emplace_back(token.lexeme);
+        advance();
+      }
+      break;
+    case TokenType::LABEL_DEFINITION:
+
+      if (DirectiveStack.back() == ".text") {
+        ctx.addTextSym(token.lexeme);
+      } else {
+        auto isExist = !StringSwitch<bool>(DirectiveStack.back())
+                            .Case(".global",
+                                  [&](auto&& _) {
+                                    ctx.addReloSym(token.lexeme);
+                                    return true;
+                                  })
+                            .Case(".globl",
+                                  [&](auto&& _) {
+                                    ctx.addReloSym(token.lexeme);
+                                    return true;
+                                  })
+                            .Error();
+
+        utils_assert(!isExist, "global symbol redefinition");
+
+        DirectiveStack.pop_back();
+      }
+      advance();
+      break;
+    case TokenType::STRING_LITERAL:
+      utils::todo("sting def pesudo not impl yet");
+      break;
+    default:
+      utils::unreachable("unkwnow type of current token");
+    }
+  }
 }

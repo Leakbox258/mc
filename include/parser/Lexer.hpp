@@ -18,6 +18,8 @@ enum class TokenType {
     HEX_INTEGER, // e.g., 0xdeadbeef
     FLOAT,       // e.g., 1.5
 
+    MODIFIERS, // %lo, %hi
+
     INSTRUCTION, // e.g., addi, lw, sd
     REGISTER,    // e.g., a0, sp, x10
 

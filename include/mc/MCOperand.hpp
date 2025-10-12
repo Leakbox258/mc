@@ -55,113 +55,140 @@ class MCInst;
 using MCReg = uint8_t;
 
 class MCOperand {
-    friend MCContext;
+  friend MCContext;
 
-    enum OpTy : unsigned char {
-        kInvalid,
-        kReg,
-        kImme,
-        kSFPImme,
-        kDFPImme,
-        kExpr,
-        kInst,
-    };
+  enum OpTy : unsigned char {
+    kInvalid,
+    kReg,
+    kImme,
+    kSFPImme,
+    kDFPImme,
+    kExpr,
+    kInst,
+  };
 
-    OpTy Kind = kInvalid;
+  OpTy Kind = kInvalid;
 
-    union {
-        MCReg Reg;
-        int64_t Imm;
-        uint32_t SFPImm;
-        uint64_t DFPImm;
-        const MCExpr* Expr;
-        const MCInst* Inst;
-    };
+  union {
+    MCReg Reg;
+    int64_t Imm;
+    uint32_t SFPImm;
+    uint64_t DFPImm;
+    const MCExpr* Expr;
+    const MCInst* Inst;
+  };
 
-  public:
-    MCOperand() : DFPImm(0) {}
+public:
+  MCOperand() : DFPImm(0) {}
 
-    static const MCOperand& makeReg(MCReg _Reg) {
-        MCOperand* ptr = (MCOperand*)(utils::malloc(sizeof(MCOperand)));
-        ::new ((void*)(ptr)) MCOperand();
-        ptr->Reg = std::move(_Reg);
-        return *ptr;
-    }
+  static const MCOperand& makeReg(MCReg _Reg) {
+    MCOperand* ptr = (MCOperand*)(utils::malloc(sizeof(MCOperand)));
+    ::new ((void*)(ptr)) MCOperand();
+    ptr->Reg = std::move(_Reg);
+    return *ptr;
+  }
 
-    static const MCOperand& makeImm(int64_t _Imm) {
-        MCOperand* ptr = (MCOperand*)(utils::malloc(sizeof(MCOperand)));
-        ::new ((void*)(ptr)) MCOperand();
-        ptr->Imm = std::move(_Imm);
-        return *ptr;
-    }
+  static const MCOperand& makeImm(int64_t _Imm) {
+    MCOperand* ptr = (MCOperand*)(utils::malloc(sizeof(MCOperand)));
+    ::new ((void*)(ptr)) MCOperand();
+    ptr->Imm = std::move(_Imm);
+    return *ptr;
+  }
 
-    static const MCOperand& makeSFPImm(uint32_t _SFPImm) {
-        MCOperand* ptr = (MCOperand*)(utils::malloc(sizeof(MCOperand)));
-        ::new ((void*)(ptr)) MCOperand();
-        ptr->SFPImm = std::move(_SFPImm);
-        return *ptr;
-    }
+  static const MCOperand& makeSFPImm(uint32_t _SFPImm) {
+    MCOperand* ptr = (MCOperand*)(utils::malloc(sizeof(MCOperand)));
+    ::new ((void*)(ptr)) MCOperand();
+    ptr->SFPImm = std::move(_SFPImm);
+    return *ptr;
+  }
 
-    static const MCOperand& makeDFPImm(uint64_t _DFPImm) {
-        MCOperand* ptr = (MCOperand*)(utils::malloc(sizeof(MCOperand)));
-        ::new ((void*)(ptr)) MCOperand();
-        ptr->DFPImm = std::move(_DFPImm);
-        return *ptr;
-    }
+  static const MCOperand& makeDFPImm(uint64_t _DFPImm) {
+    MCOperand* ptr = (MCOperand*)(utils::malloc(sizeof(MCOperand)));
+    ::new ((void*)(ptr)) MCOperand();
+    ptr->DFPImm = std::move(_DFPImm);
+    return *ptr;
+  }
 
-    static const MCOperand& makeExpr(const MCExpr* _Expr) {
-        MCOperand* ptr = (MCOperand*)(utils::malloc(sizeof(MCOperand)));
-        ::new ((void*)(ptr)) MCOperand();
-        ptr->Expr = std::move(_Expr);
-        return *ptr;
-    }
+  static const MCOperand& makeExpr(const MCExpr* _Expr) {
+    MCOperand* ptr = (MCOperand*)(utils::malloc(sizeof(MCOperand)));
+    ::new ((void*)(ptr)) MCOperand();
+    ptr->Expr = std::move(_Expr);
+    return *ptr;
+  }
 
-    static const MCOperand& makeInst(const MCInst* _Inst) {
-        MCOperand* ptr = (MCOperand*)(utils::malloc(sizeof(MCOperand)));
-        ::new ((void*)(ptr)) MCOperand();
-        ptr->Inst = std::move(_Inst);
-        return *ptr;
-    }
+  static const MCOperand& makeInst(const MCInst* _Inst) {
+    MCOperand* ptr = (MCOperand*)(utils::malloc(sizeof(MCOperand)));
+    ::new ((void*)(ptr)) MCOperand();
+    ptr->Inst = std::move(_Inst);
+    return *ptr;
+  }
 
-    bool isValid() const { return Kind != kInvalid; }
-    bool isReg() const { return Kind == kReg; }
-    bool isImm() const { return Kind == kImme; }
-    bool isSFPImm() const { return Kind == kSFPImme; }
-    bool isDFPImm() const { return Kind == kDFPImme; }
-    bool isExpr() const { return Kind == kExpr; }
-    bool isInst() const { return Kind == kInst; }
+  bool isValid() const { return Kind != kInvalid; }
+  bool isReg() const { return Kind == kReg; }
+  bool isImm() const { return Kind == kImme; }
+  bool isSFPImm() const { return Kind == kSFPImme; }
+  bool isDFPImm() const { return Kind == kDFPImme; }
+  bool isExpr() const { return Kind == kExpr; }
+  bool isInst() const { return Kind == kInst; }
 
-    MCReg getReg() const {
-        utils_assert(isReg(), "not a reg");
-        return MCReg(Reg);
-    }
+  MCReg getReg() const {
+    utils_assert(isReg(), "not a reg");
+    return Reg;
+  }
 
-    int64_t getImm() const {
-        utils_assert(isImm(), "not an immediate");
-        return Imm;
-    }
+  MCReg& getReg() {
+    utils_assert(isReg(), "not a reg");
+    return Reg;
+  }
 
-    uint32_t getSFPImm() const {
-        utils_assert(isSFPImm(), "not an SFP immediate");
-        return SFPImm;
-    }
+  int64_t getImm() const {
+    utils_assert(isImm(), "not an immediate");
+    return Imm;
+  }
 
-    uint64_t getDFPImm() const {
-        utils_assert(isDFPImm(), "not an FP immediate");
-        return DFPImm;
-    }
+  int64_t& getImm() {
+    utils_assert(isImm(), "not an immediate");
+    return Imm;
+  }
 
-    const MCExpr* getExpr() const {
-        utils_assert(isExpr(), "not an expression");
-        return Expr;
-    }
+  uint32_t getSFPImm() const {
+    utils_assert(isSFPImm(), "not an SFP immediate");
+    return SFPImm;
+  }
 
-    const MCInst* getInst() const {
-        utils_assert(isInst(), "not a sub-instruction");
-        return Inst;
-    }
+  uint32_t& getSFPImm() {
+    utils_assert(isSFPImm(), "not an SFP immediate");
+    return SFPImm;
+  }
 
-    /// TODO: dump / verify
+  uint64_t getDFPImm() const {
+    utils_assert(isDFPImm(), "not an FP immediate");
+    return DFPImm;
+  }
+
+  uint64_t& getDFPImm() {
+    utils_assert(isDFPImm(), "not an FP immediate");
+    return DFPImm;
+  }
+
+  const MCExpr* getExpr() const {
+    utils_assert(isExpr(), "not an expression");
+    return Expr;
+  }
+
+  const MCInst* getInst() const {
+    utils_assert(isInst(), "not a sub-instruction");
+    return Inst;
+  }
+
+  /// encoding here expected to be processed
+  void RewriteSymRelo(uint64_t encoding) {
+    utils_assert(isExpr(), "expecting to have at least one expr*");
+
+    Imm = encoding;
+  }
+
+  /// TODO: dump / verify
 };
 } // namespace mc
 

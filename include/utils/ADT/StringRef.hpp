@@ -124,6 +124,16 @@ class StringRef {
         return data()[size() - 1];
     }
 
+    /// c-style char array
+    template <std::size_t N>
+    [[nodiscard]] bool operator==(const char (&Array)[N]) const {
+        if (this->size() != N) {
+            return false;
+        }
+
+        return !utils::memcmp(this->data(), Array, N);
+    }
+
     /// check if the String the same
     template <typename T>
         requires ViewType<T, std::decay_t<decltype(Data)>>
@@ -133,16 +143,6 @@ class StringRef {
         }
 
         return !utils::memcmp(this->data(), StrRef.data(), this->size());
-    }
-
-    /// c-style char array
-    template <std::size_t N>
-    [[nodiscard]] bool operator==(const char (&Array)[N]) const {
-        if (this->size() != N) {
-            return false;
-        }
-
-        return !utils::memcmp(this->data(), Array, N);
     }
 
     template <typename T>

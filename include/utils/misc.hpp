@@ -1,6 +1,8 @@
 #ifndef UTILS_NUMERIC
 #define UTILS_NUMERIC
 
+#include "macro.hpp"
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -188,6 +190,39 @@ inline std::optional<int> log2(std::size_t Value) {
 }
 
 inline std::size_t pow2i(std::size_t x) { return __builtin_powi(x, 2); }
+
+// 12 + 1 / 20 + 1
+template <unsigned N> inline uint64_t signIntCompress(uint64_t integer) {
+    int64_t signed_integer = *reinterpret_cast<int64_t*>(&integer);
+
+    if (signed_integer >= 0) {
+        utils_assert(signed_integer < std::pow(2, N - 1),
+                     "size limit excessed");
+
+        return integer;
+    } else {
+        auto pad = static_cast<uint64_t>(-1) << N;
+        utils_assert((integer & pad) == pad, "size limit excessed");
+
+        return integer & static_cast<uint64_t>(-1) >> (64 - N);
+    }
+}
+
+inline uint64_t signIntCompress(uint64_t integer, unsigned size) {
+    int64_t signed_integer = *reinterpret_cast<int64_t*>(&integer);
+
+    if (signed_integer >= 0) {
+        utils_assert(signed_integer < std::pow(2, size - 1),
+                     "size limit excessed");
+
+        return integer;
+    } else {
+        auto pad = static_cast<uint64_t>(-1) << size;
+        utils_assert((integer & pad) == pad, "size limit excessed");
+
+        return integer & static_cast<uint64_t>(-1) >> (64 - size);
+    }
+}
 
 } // namespace utils
 

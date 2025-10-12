@@ -4,6 +4,7 @@
 #include "utils/likehood.hpp"
 #include <algorithm>
 #include <cctype>
+#include <cstddef>
 #include <string>
 
 using namespace parser;
@@ -24,6 +25,8 @@ std::string to_string(TokenType type) {
         return "HEX_INTEGER";
     case TokenType::FLOAT:
         return "FLOAT";
+    case TokenType::MODIFIERS:
+        return "MODIFERS";
     case TokenType::INSTRUCTION:
         return "INSTRUCTION";
     case TokenType::REGISTER:
@@ -194,6 +197,15 @@ Token Lexer::nextToken() {
     }
 
     char c = advance();
+
+    if (c == '%') {
+        size_t start = m_cursor - 1;
+        while (peek() != '(') {
+            advance();
+        }
+        return makeToken(TokenType::MODIFIERS,
+                         m_source.slice(start, m_cursor - start));
+    }
 
     if (isalpha(c) || c == '_' || c == '.') {
         if (c == '.') { // Must be a directive
