@@ -25,7 +25,16 @@ void MCContext::Relo() {
 
       uint32_t idx = std::distance(ReloSymbols.begin(), iter);
       Elf64_Rela Rela;
-      Rela.r_info = ELF64_R_INFO(idx, /* todo */);
+      Rela.r_offset = inst->getOffset();
+      Rela.r_info = ELF64_R_INFO(idx, inst->getReloType());
+
+      auto expr = inst->getExprOp();
+
+      utils_assert(expr, "failed to find an expr in current instruction");
+
+      Rela.r_addend = expr->getExpr()->getAppend();
+
+      Elf_Rela.emplace_back(std::move(Rela));
 
     } else {
       utils::unreachable("unknown sym");

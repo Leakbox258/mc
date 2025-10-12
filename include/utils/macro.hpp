@@ -12,8 +12,8 @@
 
 #ifndef NDEBUG
 #define utils_assert(condition, message)                                       \
-    utils::assert_handler(static_cast<bool>(condition), #condition, (message), \
-                          std::source_location::current())
+  utils::assert_handler(static_cast<bool>(condition), #condition, (message),   \
+                        std::source_location::current())
 #else
 #define utils_assert(condition, message) ((void)0)
 #endif

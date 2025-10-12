@@ -26,12 +26,12 @@ public:
 private:
   ExprTy Kind = kInValid;
   std::string Symbol;
-
+  uint64_t Append; // +/-
 public:
   MCExpr() : Kind(kInValid), Symbol() {}
 
-  MCExpr(ExprTy ty, StringRef _Symbol)
-      : Kind(std::move(ty)), Symbol(_Symbol.str()) {}
+  MCExpr(ExprTy ty, StringRef _Symbol, uint64_t _Append)
+      : Kind(std::move(ty)), Symbol(_Symbol.str()), Append(_Append) {}
 
   bool isLO() const { return Kind == kLO; }
   bool isHI() const { return Kind == kHI; }
@@ -45,6 +45,7 @@ public:
 
   StringRef getSym() const { return Symbol; }
   ExprTy getModifier() const { return Kind; }
+  uint64_t getAppend() const { return Append; }
 
   /// TODO: dump
 };

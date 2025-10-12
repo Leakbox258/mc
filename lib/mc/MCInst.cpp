@@ -56,7 +56,7 @@ uint32_t MCInst::getReloType() const {
   } else {
     using ExprTy = MCExpr::ExprTy;
 
-    switch (findExprOp()->getExpr()->getModifier()) {
+    switch (getExprOp()->getExpr()->getModifier()) {
     case ExprTy::kInValid:
       utils::unreachable("invalid modifier");
     case ExprTy::kLO:

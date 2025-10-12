@@ -101,12 +101,12 @@ private:
                        [&](const MCOperand& op) { return op.isExpr(); });
   }
 
-  const MCOperand* findExprOp() const {
+public:
+  const MCOperand* getExprOp() const {
     return std::find_if(Operands.begin(), Operands.end(),
                         [&](const MCOperand& op) { return op.isExpr(); });
   }
 
-public:
   uint32_t getReloType() const;
 
   /// TODO: dump(), verify()
