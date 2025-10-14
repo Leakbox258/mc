@@ -3,6 +3,7 @@
 
 #include "MCExpr.hpp"
 #include "MCInst.hpp"
+#include "MCOpCode.hpp"
 #include "utils/ADT/StringMap.hpp"
 #include "utils/ADT/StringRef.hpp"
 #include "utils/ADT/StringSet.hpp"
@@ -10,6 +11,7 @@
 #include <cstdint>
 #include <elf.h>
 #include <fstream>
+#include <ostream>
 #include <set>
 #include <string>
 #include <vector>
@@ -19,18 +21,11 @@ namespace {
 template <std::size_t N = 4096> struct ByteStream {
   using size_ty = std::size_t;
 
-  std::ofstream file;
-
   std::vector<uint8_t> buffer;
 
   explicit ByteStream() : buffer(N) {}
 
   size_ty size() const { return buffer.size(); }
-  void writein() {
-    file.write(reinterpret_cast<const char*>(buffer.data()), buffer.size());
-
-    buffer.clear();
-  }
 
   void balignTo(size_ty balign) {
     auto paddingSize = (balign - (buffer.size() % balign)) % balign;
@@ -71,6 +66,9 @@ public:
   using size_ty = std::size_t;
 
 private:
+  /// fs handle
+  std::ostream& file;
+
   /// inst use symbols, which need gen Elf64_Rela or cul offset(.text)
   std::set<std::tuple<MCInst*, std::string>> ReloInst;
 
@@ -87,7 +85,7 @@ private:
   std::vector<MCExpr> Exprs;
 
   /// .rela.text
-  std::vector<std::string>
+  std::set<std::string>
       ReloSymbols; // symbols cross sections or rely on extern libs
   std::vector<Elf64_Rela> Elf_Rela;
 
@@ -108,10 +106,7 @@ private:
   Elf64_Shdr Elf_Shdr;
 
 public:
-  MCContext() {
-    // TextBuffer = ByteStream();
-    DataBuffer = ByteStream();
-  }
+  MCContext(std::ofstream& _file) : file(_file) {}
   MCContext(const MCContext&) = delete;
   MCContext(MCContext&&) = delete;
   MCContext& operator=(const MCContext&) = delete;
@@ -120,17 +115,22 @@ private:
   /// .text symbol inline
   void Relo();
 
-  /// binary obj rewriters
-  size_ty Gen_ELF_Hdr();
-  size_ty Gen_Text();
-  size_ty Gen_Rela_Text();
-  size_ty Gen_Data();
-  size_ty Gen_Bss();
-  size_ty Gen_SymTab();
-  size_ty Gen_StrTab();
-  size_ty Gen_ShStrTab();
-  size_ty Gen_Section_Hdr_Tab();
+  /// offset of each section
+  SmallVector<std::pair<StringRef, size_ty>, 8> Offsets;
 
+  /// binary obj rewriters
+  /// concat each elem in-order
+  void Gen_ELF_Hdr();
+  void Gen_Text();
+  void Gen_Rela_Text();
+  void Gen_Data();
+  void Gen_Bss();
+  void Gen_SymTab();
+  void Gen_StrTab();
+  void Gen_ShStrTab();
+  void Gen_Section_Hdr_Tab();
+
+private:
   size_ty incTextOffset(bool IsCompressed = false) {
     return IsCompressed ? TextOffset += 2 : TextOffset += 4;
   }
@@ -144,7 +144,9 @@ public:
     return this->TextLabels.insert(Str, std::move(offset));
   }
 
-  void addReloSym(StringRef Str) { this->ReloSymbols.push_back(Str.str()); }
+  bool addReloSym(StringRef Str) {
+    return this->ReloSymbols.insert(Str.str()).second;
+  }
 
   bool getTextOffset() const { return TextOffset; }
 
@@ -157,13 +159,15 @@ public:
     return newOffset;
   }
 
-  const MCExpr* getTextExpr(std::string Symbol, MCExpr::ExprTy ty) {
-    Exprs.emplace_back(ty, Symbol);
+  const MCExpr* getTextExpr(std::string Symbol, MCExpr::ExprTy ty,
+                            uint64_t Append = 0) {
+    Exprs.emplace_back(ty, Symbol, Append);
     return &Exprs.back();
   }
 
-  const MCExpr* getTextExpr(StringRef Symbol, MCExpr::ExprTy ty) {
-    Exprs.emplace_back(ty, Symbol);
+  const MCExpr* getTextExpr(StringRef Symbol, MCExpr::ExprTy ty,
+                            uint64_t Append = 0) {
+    Exprs.emplace_back(ty, Symbol, Append);
     return &Exprs.back();
   }
 

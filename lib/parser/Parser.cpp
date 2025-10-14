@@ -219,17 +219,48 @@ void Parser::parse() {
                    "expecting left paren after a modifier");
       auto Symbol = token.lexeme; // IDENTIFIER
       advance();
+
+      uint64_t Append = 0;
+      if (token.type == TokenType::EXPR_OPERATOR) {
+        /// parse op and constexpr
+        auto op = token.lexeme == "+" ? 1ll : -1ll;
+
+        advance();
+
+        utils_assert(token.type == TokenType::INTEGER,
+                     "expecting integer append");
+
+        op *= std::stoll(token.lexeme); // no hex
+
+        Append = *reinterpret_cast<uint64_t*>(&op);
+
+        advance();
+      }
+
       utils_assert(token.type == TokenType::RPAREN,
                    "expecting right paren after a modifier");
 
-      curInst->addOperand(MCOperand::makeExpr(ctx.getTextExpr(Symbol, ty)));
+      curInst->addOperand(
+          MCOperand::makeExpr(ctx.getTextExpr(Symbol, ty, Append)));
 
       ctx.addReloInst(&(*curInst), Symbol);
     }
       advance();
       break;
-    case TokenType::INSTRUCTION:
+    case TokenType::INSTRUCTION: {
       *curInst = MCInst(token.lexeme, token.loc, curOffset);
+
+      auto [instAlign, padInst] =
+          (*curInst).isCompressed()
+              ? std::make_tuple(2, MCInst::makeCNop(token.loc, curOffset))
+              : std::make_tuple(4, MCInst::makeNop(token.loc, curOffset));
+
+      /// make align
+      if (curOffset % instAlign) {
+        curInst->modifyOffset(ctx.addTextInst(std::move(padInst)));
+        curOffset = curInst->getOffset();
+      }
+    }
       advance();
       break;
     case TokenType::REGISTER:
@@ -258,18 +289,11 @@ void Parser::parse() {
       if (DirectiveStack.back() == ".text") {
         ctx.addTextSym(token.lexeme);
       } else {
-        auto isExist = !StringSwitch<bool>(DirectiveStack.back())
-                            .Case(".global",
-                                  [&](auto&& _) {
-                                    ctx.addReloSym(token.lexeme);
-                                    return true;
-                                  })
-                            .Case(".globl",
-                                  [&](auto&& _) {
-                                    ctx.addReloSym(token.lexeme);
-                                    return true;
-                                  })
-                            .Error();
+        auto isExist =
+            !StringSwitch<bool>(DirectiveStack.back())
+                 .Case(".global", ".globl",
+                       [&](auto&& _) { return ctx.addReloSym(token.lexeme); })
+                 .Error();
 
         utils_assert(!isExist, "global symbol redefinition");
 

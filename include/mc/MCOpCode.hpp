@@ -62,6 +62,8 @@ struct EnCoding {
 
   EnCodeTy kind = kInvalid;
   unsigned length;
+
+  /// TODO: it's more reasonable to split the encodings
   std::optional<std::array<std::pair<uint16_t, uint16_t>, 8>> bit_range;
   std::optional<uint16_t> static_pattern;
 };
@@ -87,13 +89,13 @@ private:
       auto ranges = range.split<8>(':');
 
       // `low` will probably be empty
-      auto low = ranges[1];
-      auto high = ranges.size() == 2 ? ranges[0] : low;
+      auto high = ranges[0];
+      auto low = ranges.size() == 2 ? ranges[1] : ranges[0];
 
       auto low_bit = low.empty() ? -1 : utils::stoi(low.c_str(), low.size());
       auto high_bit = utils::stoi(high.c_str(), high.size());
 
-      bit_range[idx++] = {low_bit, high_bit};
+      bit_range[idx++] = {high_bit, low_bit};
       length += high_bit - low_bit + 1;
     }
 

@@ -3,7 +3,7 @@
 
 #include "utils/ADT/StringMap.hpp"
 #include "utils/macro.hpp"
-#include "utils/memory.hpp"
+#include "utils/misc.hpp"
 #include <cstdint>
 namespace mc {
 
@@ -78,49 +78,57 @@ class MCOperand {
     const MCInst* Inst;
   };
 
+  /// imms in RV maybe distribute separately
+  /// when traversal MCOpCode::EnCoding, use this elem to record the length that
+  /// is already used
+  /// when op is arith: use 12 elements
+  /// when op is branch: use 13 elements (the lowest never used)
+  /// when op is jump: use 21 elements (the lowest never used)
+  std::array<unsigned char, 21> used{};
+
 public:
   MCOperand() : DFPImm(0) {}
 
-  static const MCOperand& makeReg(MCReg _Reg) {
-    MCOperand* ptr = (MCOperand*)(utils::malloc(sizeof(MCOperand)));
-    ::new ((void*)(ptr)) MCOperand();
-    ptr->Reg = std::move(_Reg);
-    return *ptr;
+  static MCOperand makeReg(MCReg _Reg) {
+    MCOperand op;
+
+    op.Reg = std::move(_Reg);
+    return op;
   }
 
-  static const MCOperand& makeImm(int64_t _Imm) {
-    MCOperand* ptr = (MCOperand*)(utils::malloc(sizeof(MCOperand)));
-    ::new ((void*)(ptr)) MCOperand();
-    ptr->Imm = std::move(_Imm);
-    return *ptr;
+  static MCOperand makeImm(int64_t _Imm) {
+    MCOperand op;
+
+    op.Imm = std::move(_Imm);
+    return op;
   }
 
-  static const MCOperand& makeSFPImm(uint32_t _SFPImm) {
-    MCOperand* ptr = (MCOperand*)(utils::malloc(sizeof(MCOperand)));
-    ::new ((void*)(ptr)) MCOperand();
-    ptr->SFPImm = std::move(_SFPImm);
-    return *ptr;
+  static MCOperand makeSFPImm(uint32_t _SFPImm) {
+    MCOperand op;
+
+    op.SFPImm = std::move(_SFPImm);
+    return op;
   }
 
-  static const MCOperand& makeDFPImm(uint64_t _DFPImm) {
-    MCOperand* ptr = (MCOperand*)(utils::malloc(sizeof(MCOperand)));
-    ::new ((void*)(ptr)) MCOperand();
-    ptr->DFPImm = std::move(_DFPImm);
-    return *ptr;
+  static MCOperand makeDFPImm(uint64_t _DFPImm) {
+    MCOperand op;
+
+    op.DFPImm = std::move(_DFPImm);
+    return op;
   }
 
-  static const MCOperand& makeExpr(const MCExpr* _Expr) {
-    MCOperand* ptr = (MCOperand*)(utils::malloc(sizeof(MCOperand)));
-    ::new ((void*)(ptr)) MCOperand();
-    ptr->Expr = std::move(_Expr);
-    return *ptr;
+  static MCOperand makeExpr(const MCExpr* _Expr) {
+    MCOperand op;
+
+    op.Expr = std::move(_Expr);
+    return op;
   }
 
-  static const MCOperand& makeInst(const MCInst* _Inst) {
-    MCOperand* ptr = (MCOperand*)(utils::malloc(sizeof(MCOperand)));
-    ::new ((void*)(ptr)) MCOperand();
-    ptr->Inst = std::move(_Inst);
-    return *ptr;
+  static MCOperand makeInst(const MCInst* _Inst) {
+    MCOperand op;
+
+    op.Inst = std::move(_Inst);
+    return op;
   }
 
   bool isValid() const { return Kind != kInvalid; }
@@ -128,6 +136,7 @@ public:
   bool isImm() const { return Kind == kImme; }
   bool isSFPImm() const { return Kind == kSFPImme; }
   bool isDFPImm() const { return Kind == kDFPImme; }
+  bool isGImm() const { return utils::in_set(Kind, kImme, kSFPImme, kDFPImme); }
   bool isExpr() const { return Kind == kExpr; }
   bool isInst() const { return Kind == kInst; }
 
@@ -171,6 +180,11 @@ public:
     return DFPImm;
   }
 
+  uint64_t getGImm() const {
+    utils_assert(isGImm(), "not an Generic immediate");
+    return Imm;
+  }
+
   const MCExpr* getExpr() const {
     utils_assert(isExpr(), "not an expression");
     return Expr;
@@ -185,7 +199,21 @@ public:
   void RewriteSymRelo(uint64_t encoding) {
     utils_assert(isExpr(), "expecting to have at least one expr*");
 
+    /// change Kind
     Imm = encoding;
+  }
+
+  /// only for imm operands
+  /// closed interval
+  uint32_t getImmSlice(uint8_t upper, uint8_t lower) {
+    for (uint8_t iter = lower; iter <= upper; ++iter) {
+      // utils_assert()
+      used[iter] = 1;
+    }
+
+    // fit Imm/SFPImm/DFPImm
+
+    return (Imm >> (lower - 1)) & ((1u << (upper - lower + 1)) - 1);
   }
 
   /// TODO: dump / verify

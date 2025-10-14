@@ -2,6 +2,7 @@
 #include "mc/MCExpr.hpp"
 #include "mc/MCOpCode.hpp"
 #include "mc/MCOperand.hpp"
+#include "utils/logger.hpp"
 #include "utils/macro.hpp"
 #include "utils/misc.hpp"
 #include <algorithm>
@@ -80,4 +81,68 @@ uint32_t MCInst::getReloType() const {
       return R_RISCV_TLS_GD_HI20;
     }
   }
+}
+
+uint32_t MCInst::makeEncoding() const {
+  auto& pattern = OpCode->encodings;
+
+  struct Bits {
+    uint32_t bits = 0;
+    unsigned length;
+
+    void add(uint32_t elem, unsigned len) {
+      bits |= (elem & ((1u << len) - 1)) << length;
+      length += len;
+    }
+  };
+
+  Bits inst;
+
+  for (auto& encode : pattern) {
+    auto length = encode.length;
+
+    switch (encode.kind) {
+    case EnCoding::kInvalid:
+      utils::unreachable("invalid encoding");
+    case EnCoding::kStatic:
+      inst.add(*encode.static_pattern, length);
+      break;
+    case EnCoding::kRd:
+    case EnCoding::kRd_short:
+      inst.add(this->findRegOp<0>().getReg(), length);
+      break;
+    case EnCoding::kRs1:
+    case EnCoding::kRs1_short:
+      inst.add(this->findRegOp<1>().getReg(), length);
+      break;
+    case EnCoding::kRs2:
+    case EnCoding::kRs2_short:
+      inst.add(this->findRegOp<2>().getReg(), length);
+      break;
+    case EnCoding::kRs3:
+    case EnCoding::kRs3_short:
+      inst.add(this->findRegOp<3>().getReg(), length);
+      break;
+    case EnCoding::kRm:
+    case EnCoding::kMemFence:
+    case EnCoding::kImm:
+    case EnCoding::kNzImm:
+    case EnCoding::kUImm:
+      auto immOp = this->findImmOp();
+
+      for (auto [high, low] : *encode.bit_range) {
+        inst.add(immOp.getImmSlice(high, low), high - low + 1);
+      }
+
+      break;
+    }
+  }
+
+  if (this->isCompressed()) {
+    utils_assert(inst.length == 16, "encoding check failed");
+  } else {
+    utils_assert(inst.length == 32, "encoding check failed");
+  }
+
+  return inst.bits;
 }

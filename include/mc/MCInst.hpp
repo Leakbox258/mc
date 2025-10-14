@@ -28,7 +28,7 @@ private:
 
 public:
   MCInst() = delete;
-  explicit MCInst(MCOpCode* _OpCode LIFETIME_BOUND, Location _Loc,
+  explicit MCInst(const MCOpCode* _OpCode LIFETIME_BOUND, Location _Loc,
                   size_ty _Offset)
       : OpCode(_OpCode), Loc(_Loc), Offset(_Offset), Operands(6) {}
 
@@ -41,18 +41,11 @@ public:
     return Operands.size();
   }
 
-  const MCOperand& addOperand(MCOperand&& newOp) {
+  MCOperand& addOperand(MCOperand&& newOp) {
     utils_assert(Operands.size() < Operands.capacity(),
                  "too many operand for an inst");
     Operands.push_back(std::move(newOp));
     return Operands.back();
-  }
-
-  void addOperand(const MCOperand& newOp) {
-    utils_assert(Operands.size() < Operands.capacity(),
-                 "too many operand for an inst");
-
-    Operands.push_back(newOp);
   }
 
   const MCOpCode* getOpCode() const { return OpCode; }
@@ -83,6 +76,7 @@ public:
   }
 
   size_ty getOffset() const { return Offset; }
+  void modifyOffset(size_ty newOffset) { Offset = newOffset; }
 
   using const_iter = decltype(Operands)::const_iter;
   using const_rev_iter = decltype(Operands)::const_rev_iter;
@@ -108,6 +102,49 @@ public:
   }
 
   uint32_t getReloType() const;
+
+  constexpr static MCInst makeNop(Location Loc, size_ty Offset) {
+    auto nop = MCInst(parser::MnemonicFind("addi"), Loc, Offset);
+    nop.addOperand(MCOperand::makeReg(*Registers.find("x0")));
+    nop.addOperand(MCOperand::makeReg(*Registers.find("x0")));
+    nop.addOperand(MCOperand::makeImm(0));
+    return nop;
+  }
+
+  constexpr static MCInst makeCNop(Location Loc, size_ty Offset) {
+    return MCInst(parser::MnemonicFind("c.nop"), Loc, Offset);
+  }
+
+  uint32_t makeEncoding() const;
+
+private:
+  /// 0 = Rd, 1 = Rs1, 2 = Rs2, 3 = Rs3
+  template <unsigned idx> const MCOperand& findRegOp() const {
+    int i = 0;
+    for (auto& op : Operands) {
+      if (!op.isReg()) {
+        continue;
+      }
+
+      if (i == idx) {
+        return op;
+      } else {
+        ++i;
+      }
+    }
+
+    utils::unreachable("cant find the right reg op");
+  }
+
+  const MCOperand& findImmOp() const {
+    // assume that only one immOp in per RV inst
+    for (auto& op : Operands) {
+      if (op.isGImm()) {
+        return op;
+      }
+    }
+    utils::unreachable("cant find the imm op");
+  }
 
   /// TODO: dump(), verify()
 };
