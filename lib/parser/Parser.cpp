@@ -250,14 +250,20 @@ void Parser::parse() {
     case TokenType::INSTRUCTION: {
       *curInst = MCInst(token.lexeme, token.loc, curOffset);
 
-      auto [instAlign, padInst] =
+      auto [instAlign, padInst0, padInst1] =
           (*curInst).isCompressed()
-              ? std::make_tuple(2, MCInst::makeCNop(token.loc, curOffset))
-              : std::make_tuple(4, MCInst::makeNop(token.loc, curOffset));
+              ? std::make_tuple(2, MCInst::makeNop(token.loc, curOffset),
+                                std::nullopt)
+              : std::make_tuple(
+                    4, MCInst::makeNop(token.loc, curOffset),
+                    std::make_optional(MCInst::makeNop(token.loc, curOffset)));
 
       /// make align
       if (curOffset % instAlign) {
-        curInst->modifyOffset(ctx.addTextInst(std::move(padInst)));
+        curInst->modifyOffset(ctx.addTextInst(std::move(padInst0)));
+        if (padInst1) {
+          curInst->modifyOffset(ctx.addTextInst(std::move(*padInst1)));
+        }
         curOffset = curInst->getOffset();
       }
     }
@@ -287,17 +293,28 @@ void Parser::parse() {
     case TokenType::LABEL_DEFINITION:
 
       if (DirectiveStack.back() == ".text") {
-        ctx.addTextSym(token.lexeme);
+        ctx.addTextLabel(token.lexeme);
       } else {
         auto isExist =
             !StringSwitch<bool>(DirectiveStack.back())
                  .Case(".global", ".globl",
-                       [&](auto&& _) { return ctx.addReloSym(token.lexeme); })
+                       [&](auto&& _) {
+                         const auto& section =
+                             DirectiveStack[DirectiveStack.size() - 2];
+
+                         if (section == ".data") {
+                           ctx.addDataVar(token.lexeme);
+                         } else if (section == ".bss") {
+                           ctx.addBssVar(token.lexeme);
+                         }
+
+                         return ctx.addReloSym(token.lexeme);
+                       })
                  .Error();
 
         utils_assert(!isExist, "global symbol redefinition");
 
-        DirectiveStack.pop_back();
+        DirectiveStack.pop_back(); // .global, .globl
       }
       advance();
       break;

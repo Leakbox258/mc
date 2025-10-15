@@ -4,11 +4,13 @@
 #include "MCExpr.hpp"
 #include "MCInst.hpp"
 #include "MCOpCode.hpp"
+#include "utils/ADT/ByteStream.hpp"
 #include "utils/ADT/StringMap.hpp"
 #include "utils/ADT/StringRef.hpp"
 #include "utils/ADT/StringSet.hpp"
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <elf.h>
 #include <fstream>
 #include <ostream>
@@ -16,50 +18,11 @@
 #include <string>
 #include <vector>
 
-namespace {
-
-template <std::size_t N = 4096> struct ByteStream {
-  using size_ty = std::size_t;
-
-  std::vector<uint8_t> buffer;
-
-  explicit ByteStream() : buffer(N) {}
-
-  size_ty size() const { return buffer.size(); }
-
-  void balignTo(size_ty balign) {
-    auto paddingSize = (balign - (buffer.size() % balign)) % balign;
-
-    for (auto i = 0ull; i < paddingSize; ++i) {
-      buffer.push_back('\x00');
-    }
-  }
-
-  template <IsPOD T> ByteStream& operator<<(T&& Value) {
-
-    this->balignTo(sizeof(T));
-
-    for (int i = 0; i < sizeof(T); ++i) {
-      buffer.push_back(((uint8_t*)(&Value))[i]);
-    }
-
-    return *this;
-  }
-
-  template <size_ty Num> ByteStream& operator<<(const char (&Value)[Num]) {
-    for (int i = 0; i < Num; ++i) {
-      buffer.push_back(Value[i]);
-    }
-
-    return *this;
-  }
-};
-} // namespace
-
 namespace mc {
 using StringRef = utils::ADT::StringRef;
 template <typename V> using StringMap = utils::ADT::StringMap<V>;
 using StringSet = utils::ADT::StringSet<>;
+using ByteStream = utils::ADT::ByteStream;
 
 class MCContext {
 public:
@@ -90,20 +53,24 @@ private:
   std::vector<Elf64_Rela> Elf_Rela;
 
   /// .data
-  ByteStream<> DataBuffer;
+  StringMap<size_ty> DataVariables;
+  ByteStream DataBuffer;
 
   /// .bss
+  StringMap<size_ty> BssVariables;
   size_ty BssSize;
 
-  /// .symtab
+  /// TODO: add .symtab section
   std::vector<Elf64_Sym> Elf_Syms;
 
   /// .strtab
+  ByteStream StrTabBuffer;
 
   /// .shstrtab
+  ByteStream SHStrTabBuffer;
 
   /// Section Header Table
-  Elf64_Shdr Elf_Shdr;
+  SmallVector<Elf64_Shdr, 8> Elf_Shdrs;
 
 public:
   MCContext(std::ofstream& _file) : file(_file) {}
@@ -116,7 +83,7 @@ private:
   void Relo();
 
   /// offset of each section
-  SmallVector<std::pair<StringRef, size_ty>, 8> Offsets;
+  StringMap<size_ty> Offsets;
 
   /// binary obj rewriters
   /// concat each elem in-order
@@ -125,8 +92,8 @@ private:
   void Gen_Rela_Text();
   void Gen_Data();
   void Gen_Bss();
-  void Gen_SymTab();
   void Gen_StrTab();
+  void Gen_SymTab();
   void Gen_ShStrTab();
   void Gen_Section_Hdr_Tab();
 
@@ -136,11 +103,11 @@ private:
   }
 
 public:
-  bool addTextSym(StringRef Str) {
+  bool addTextLabel(StringRef Str) {
     return this->TextLabels.insert(Str, TextOffset);
   }
 
-  bool addTextSym(StringRef Str, size_ty offset) {
+  bool addTextLabel(StringRef Str, size_ty offset) {
     return this->TextLabels.insert(Str, std::move(offset));
   }
 
@@ -185,12 +152,20 @@ public:
     return this->DataBuffer.size();
   }
 
+  bool addDataVar(StringRef Varibale) {
+    return this->DataVariables.insert(Varibale, this->DataBuffer.size());
+  }
+
   size_ty makeDataBufAlign(size_ty balign) {
     this->DataBuffer.balignTo(balign);
     return this->DataBuffer.size();
   }
 
   size_ty pushBssBuf(size_ty size) { return this->BssSize += size; }
+
+  bool addBssVar(StringRef Varibale) {
+    return this->BssVariables.insert(Varibale, this->BssSize);
+  }
 
   size_ty makeBssBufAlign(size_ty balign) {
     return this->BssSize += (balign - this->BssSize % balign) % balign;
