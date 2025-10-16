@@ -1,5 +1,4 @@
 #include "mc/MCContext.hpp"
-#include "utils/logger.hpp"
 #include "utils/macro.hpp"
 #include <algorithm>
 #include <cstdint>
@@ -22,12 +21,14 @@ void MCContext::Relo() {
       inst->reloSym(offset);
 
     }
-    /// else: configure Elf_Rela
-    else if (auto iter = std::find(ReloSymbols.begin(), ReloSymbols.end(), sym);
+    /// else if: symbols from .data or .bss configure Elf_Rela
+    else if (auto iter =
+                 std::find_if(ReloSymbols.begin(), ReloSymbols.end(),
+                              [&](auto&& elem) { return elem.first == sym; });
              iter != ReloSymbols.end()) {
 
       uint32_t idx = std::distance(ReloSymbols.begin(), iter);
-      Elf64_Rela Rela;
+      Elf64_Rela Rela = {};
       Rela.r_offset = inst->getOffset();
       Rela.r_info = ELF64_R_INFO(
           idx, inst->getReloType()); // idx pointer to idx in .symtab
@@ -42,8 +43,17 @@ void MCContext::Relo() {
 
       inst->reloSym(0ll);
 
-    } else {
-      utils::unreachable("unknown sym");
+    }
+    /// extern symbols
+    else {
+      ReloSymbols.insert({
+          sym,
+          NdxSection::und,
+      });
+      uint32_t idx = ReloSymbols.size() - 1;
+      Elf64_Rela Rela = {};
+      Rela.r_offset = inst->getOffset();
+      Rela.r_info = ELF64_R_INFO(idx, inst->getReloType());
     }
   }
 }
@@ -78,7 +88,10 @@ void MCContext::Ehdr_Shdr() {
     offset += (alignment - (offset % alignment)) % alignment;
   };
 
-  offset += sizeof(std::decay_t<decltype(hdr)>);
+  {
+    Offsets.insert("elf header", 0);
+    offset += sizeof(std::decay_t<decltype(hdr)>);
+  }
 
   {
     mkAlign(2);
@@ -106,7 +119,7 @@ void MCContext::Ehdr_Shdr() {
     /// include label, symbol(relos, variables)
     StrTabBuffer << '\x00';
 
-    for (const auto& relo_sym : ReloSymbols) {
+    for (const auto& [relo_sym, ndx] : ReloSymbols) {
       StrTabBuffer << relo_sym.c_str() << '\x00';
     }
 
@@ -120,7 +133,35 @@ void MCContext::Ehdr_Shdr() {
   {
     mkAlign(8);
     Offsets.insert(".symtab", offset);
-    offset += TextLabels.keys().size() * sizeof(Elf64_Sym);
+    offset += (TextLabels.keys().size() - 2) * sizeof(Elf64_Sym);
+
+    /// begin with none
+    Elf64_Sym symbol = {};
+    Elf_Syms.emplace_back(std::move(symbol));
+
+    /// relo symbols
+    for (const auto& [sym, ndx] : ReloSymbols) {
+      Elf64_Sym symbol = {};
+
+      symbol.st_name = StrTabBuffer.findOffset(sym); /// ？
+      symbol.st_info = ELF64_ST_INFO(STB_GLOBAL, STT_NOTYPE);
+      symbol.st_other = ELF64_ST_VISIBILITY(STV_DEFAULT); // visibility
+      symbol.st_shndx = ndx;
+
+      Elf_Syms.emplace_back(std::move(symbol));
+    }
+
+    /// sections
+    const auto& sections = Offsets.keys();
+    for (size_ty i = 1; i < sections.size() - 1; ++i) {
+      Elf64_Sym symbol = {};
+
+      symbol.st_info = ELF64_ST_INFO(STB_LOCAL, STT_SECTION);
+      symbol.st_other = ELF64_ST_VISIBILITY(STV_DEFAULT);
+      symbol.st_shndx = i;
+
+      Elf_Syms.emplace_back(std::move(symbol));
+    }
   }
 
   {

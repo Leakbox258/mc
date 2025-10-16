@@ -48,6 +48,19 @@ public:
     Entry.ValuePtr = nullptr;
   }
 
+  StringMapEntry(utils::ADT::StringRef Str, const ValueTy& Val) {
+    this->KeyLength = Str.size();
+    this->KeyPtr = (char*)utils::malloc(this->KeyLength);
+
+    utils_assert(Str.data(), "Expect Data to be valid");
+
+    std::memcpy(this->KeyPtr, Str.data(), this->KeyLength);
+
+    ValuePtr = (ValueTy*)utils::malloc(sizeof(ValueTy));
+
+    ::new ((void*)ValuePtr) ValueTy(Val);
+  }
+
   StringMapEntry(utils::ADT::StringRef Str, ValueTy&& Val) {
     this->KeyLength = Str.size();
     this->KeyPtr = (char*)utils::malloc(this->KeyLength);
@@ -66,6 +79,10 @@ public:
   [[nodiscard]] utils::ADT::StringRef getEntry() const {
     return utils::ADT::StringRef(KeyPtr, KeyLength);
   }
+
+  [[nodiscard]] const ValueTy* getValue() const { return ValuePtr; }
+
+  [[nodiscard]] ValueTy* getValue() { return ValuePtr; }
 
   ~StringMapEntry() {
     free(KeyPtr);
@@ -154,8 +171,8 @@ protected:
   }
 
   ~StringMapImpl() {
-    for (auto& Table : SmallSizeTyTable) {
-      Table.clear();
+    for (unsigned i = 0; i < SmallLength; ++i) {
+      SmallSizeTyTable[i].clear();
     }
     for (auto& [Key, Table] : LargeSizeTyTable) {
       Table.clear();
@@ -185,7 +202,7 @@ public:
   StringMap(std::initializer_list<std::pair<StringRef, V>>&& list)
       : StringMap() {
 
-    for (auto& [Str, Val] : list) {
+    for (auto [Str, Val] : list) {
       utils_assert(!this->insert(Str, Val), "StringRef Key is conflicted");
     }
   }
@@ -212,23 +229,23 @@ public:
     size_ty KeyLength = Key.size();
     if (is_likely(KeyLength < SL)) {
       for (const auto& Entry : this->SmallSizeTyTable[KeyLength]) {
-        if (is_unlikely(Entry.getEntry()) == Key) {
+        if (is_unlikely(utils::ADT::operator==(Entry.getEntry(), Key))) {
           return false;
         }
       }
       this->SmallSizeTyTable[KeyLength].emplace_back(Key, std::forward<V>(Val));
-      this->Keys.emplace_back(Key);
+      this->Keys.emplace_back(Key.str());
       Size++;
       return true;
     } else {
       auto& Table = this->LargeSizeTyTable[KeyLength];
       for (const auto& Entry : Table) {
-        if (is_unlikely(Entry.getEntry()) == Key) {
+        if (is_unlikely(utils::ADT::operator==(Entry.getEntry(), Key))) {
           return false;
         }
       }
       Table.emplace_back(Key, std::forward<V>(Val));
-      this->Keys.emplace_back(Key);
+      this->Keys.emplace_back(Key.str());
       Size++;
       return true;
     }
@@ -238,23 +255,24 @@ public:
     size_ty KeyLength = Key.size();
     if (is_likely(KeyLength < SL)) {
       for (const auto& Entry : this->SmallSizeTyTable[KeyLength]) {
-        if (is_unlikely(Entry.getEntry()) == Key) {
+        if (is_unlikely(utils::ADT::operator==(Entry.getEntry(), Key))) {
           return false;
         }
       }
-      this->SmallSizeTyTable[KeyLength].emplace_back(Key, std::forward<V>(Val));
-      this->Keys.emplace_back(Key);
+      this->SmallSizeTyTable[KeyLength].emplace_back(
+          std::forward<StringRef>(Key), Val);
+      this->Keys.emplace_back(Key.str());
       Size++;
       return true;
     } else {
       auto& Table = this->LargeSizeTyTable[KeyLength];
       for (const auto& Entry : Table) {
-        if (is_unlikely(Entry.getEntry()) == Key) {
+        if (is_unlikely(utils::ADT::operator==(Entry.getEntry(), Key))) {
           return false;
         }
       }
-      Table.emplace_back(Key, std::forward<V>(Val));
-      this->Keys.emplace_back(Key);
+      Table.emplace_back(Key.str(), Val);
+      this->Keys.emplace_back(Key.str());
       Size++;
       return true;
     }
@@ -265,8 +283,8 @@ public:
     size_ty KeyLength = Key.size();
     if (is_likely(KeyLength) < SL) {
       for (auto& Entry : this->SmallSizeTyTable[KeyLength]) {
-        if (Entry.getEntry() == Key) {
-          return Entry.ValuePtr;
+        if (utils::ADT::operator==(Entry.getEntry(), Key)) {
+          return Entry.getValue();
         }
       }
       return nullptr;
@@ -276,8 +294,8 @@ public:
         return nullptr;
       }
       for (auto& Entry : It->second) {
-        if (Entry.getEntry() == Key) {
-          return Entry.ValuePtr;
+        if (utils::ADT::operator==(Entry.getEntry(), Key)) {
+          return Entry.getValue();
         }
       }
       return nullptr;
@@ -288,8 +306,8 @@ public:
     size_ty KeyLength = Key.size();
     if (is_likely(KeyLength) < SL) {
       for (auto& Entry : this->SmallSizeTyTable[KeyLength]) {
-        if (Entry.getEntry() == Key) {
-          return Entry.ValuePtr;
+        if (utils::ADT::operator==(Entry.getEntry(), Key)) {
+          return Entry.getValue();
         }
       }
       return nullptr;
@@ -299,8 +317,8 @@ public:
         return nullptr;
       }
       for (auto& Entry : It->second) {
-        if (Entry.getEntry() == Key) {
-          return Entry.ValuePtr;
+        if (utils::ADT::operator==(Entry.getEntry(), Key)) {
+          return Entry.getValue();
         }
       }
       return nullptr;

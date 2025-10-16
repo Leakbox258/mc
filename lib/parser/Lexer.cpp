@@ -7,8 +7,7 @@
 #include <cstddef>
 #include <string>
 
-using namespace parser;
-
+namespace parser {
 std::string to_string(TokenType type) {
   switch (type) {
   case TokenType::UNKNOWN:
@@ -51,6 +50,9 @@ std::string to_string(TokenType type) {
     return "TYPE_ERROR";
   }
 }
+} // namespace parser
+
+using namespace parser;
 
 void Token::print() const {
   std::cout << "Token(" << to_string(type) << ", lexeme: '" << lexeme << "', "

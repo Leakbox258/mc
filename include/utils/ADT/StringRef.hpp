@@ -154,7 +154,7 @@ public:
 
   template <std::size_t N>
   [[nodiscard]] bool same_instance(const char (&Array)[N]) const {
-    return N == this->size();
+    return N == this->size() && this->data() == Array;
   }
 
   [[nodiscard]] char operator[](std::size_t index) const {
@@ -237,6 +237,14 @@ public:
     std::sscanf(data(), format.Data, Args...);
   }
 };
+
+[[nodiscard]] inline bool operator==(const StringRef& StrRef0,
+                                     const StringRef& StrRef1) {
+  if (StrRef0.size() != StrRef1.size()) {
+    return false;
+  }
+  return utils::memcmp(StrRef0.data(), StrRef1.data(), StrRef0.size()) == 0;
+}
 
 } // namespace ADT
 } // namespace utils

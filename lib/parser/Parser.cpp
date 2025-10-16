@@ -250,20 +250,15 @@ void Parser::parse() {
     case TokenType::INSTRUCTION: {
       *curInst = MCInst(token.lexeme, token.loc, curOffset);
 
-      auto [instAlign, padInst0, padInst1] =
+      auto [instAlign, padInst] =
           (*curInst).isCompressed()
-              ? std::make_tuple(2, MCInst::makeNop(token.loc, curOffset),
-                                std::nullopt)
-              : std::make_tuple(
-                    4, MCInst::makeNop(token.loc, curOffset),
-                    std::make_optional(MCInst::makeNop(token.loc, curOffset)));
+              ? std::make_tuple(2, MCInst::makeNop(token.loc, curOffset))
+              : std::make_tuple(4, MCInst::makeNop(token.loc, curOffset));
 
       /// make align
       if (curOffset % instAlign) {
-        curInst->modifyOffset(ctx.addTextInst(std::move(padInst0)));
-        if (padInst1) {
-          curInst->modifyOffset(ctx.addTextInst(std::move(*padInst1)));
-        }
+        curInst->modifyOffset(ctx.addTextInst(std::move(padInst)));
+
         curOffset = curInst->getOffset();
       }
     }
@@ -295,6 +290,8 @@ void Parser::parse() {
       if (DirectiveStack.back() == ".text") {
         ctx.addTextLabel(token.lexeme);
       } else {
+        using Ndx = MCContext::NdxSection;
+
         auto isExist =
             !StringSwitch<bool>(DirectiveStack.back())
                  .Case(".global", ".globl",
@@ -304,11 +301,16 @@ void Parser::parse() {
 
                          if (section == ".data") {
                            ctx.addDataVar(token.lexeme);
+                           return ctx.addReloSym(token.lexeme, Ndx::data);
                          } else if (section == ".bss") {
                            ctx.addBssVar(token.lexeme);
+                           return ctx.addReloSym(token.lexeme, Ndx::bss);
+                         } else if (section == ".text") {
+                           return ctx.addReloSym(token.lexeme, Ndx::text);
                          }
 
-                         return ctx.addReloSym(token.lexeme);
+                         utils::unreachable(
+                             "cant match the section of this label");
                        })
                  .Error();
 

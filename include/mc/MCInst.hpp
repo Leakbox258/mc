@@ -103,7 +103,6 @@ public:
 
   uint32_t getReloType() const;
 
-  // 你可能不信，但是 addi x0, x0, 0 (nop) 是两字节的
   constexpr static MCInst makeNop(Location Loc, size_ty Offset) {
     auto nop = MCInst(parser::MnemonicFind("addi"), Loc, Offset);
     nop.addOperand(MCOperand::makeReg(*Registers.find("x0")));
@@ -112,9 +111,9 @@ public:
     return nop;
   }
 
-  // constexpr static MCInst makeCNop(Location Loc, size_ty Offset) {
-  //   return MCInst(parser::MnemonicFind("c.nop"), Loc, Offset);
-  // }
+  constexpr static MCInst makeCNop(Location Loc, size_ty Offset) {
+    return MCInst(parser::MnemonicFind("c.nop"), Loc, Offset);
+  }
 
   uint32_t makeEncoding() const;
 

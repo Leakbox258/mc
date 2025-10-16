@@ -30,7 +30,7 @@ struct ByteStream {
 
     this->balignTo(sizeof(T));
 
-    for (int i = 0; i < sizeof(T); ++i) {
+    for (unsigned long i = 0; i < sizeof(T); ++i) {
       buffer.push_back(((uint8_t*)(&Value))[i]);
     }
 

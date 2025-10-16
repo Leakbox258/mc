@@ -48,7 +48,17 @@ private:
   std::vector<MCExpr> Exprs;
 
   /// .rela.text
-  std::set<std::string>
+
+public:
+  enum NdxSection : uint8_t {
+    text = 1,
+    data,
+    bss,
+    und = 0,
+  };
+
+private:
+  std::set<std::pair<std::string, NdxSection>>
       ReloSymbols; // symbols cross sections or rely on extern libs
   std::vector<Elf64_Rela> Elf_Relas;
 
@@ -87,7 +97,6 @@ private:
 
   // elf header & section headers (table)
   void Ehdr_Shdr();
-  void writein();
 
 private:
   size_ty incTextOffset(bool IsCompressed = false) {
@@ -95,6 +104,9 @@ private:
   }
 
 public:
+  /// build obj file
+  void writein();
+
   bool addTextLabel(StringRef Str) {
     return this->TextLabels.insert(Str, TextOffset);
   }
@@ -103,8 +115,8 @@ public:
     return this->TextLabels.insert(Str, std::move(offset));
   }
 
-  bool addReloSym(StringRef Str) {
-    return this->ReloSymbols.insert(Str.str()).second;
+  bool addReloSym(StringRef Str, NdxSection ndx) {
+    return this->ReloSymbols.insert({Str.str(), ndx}).second;
   }
 
   bool getTextOffset() const { return TextOffset; }

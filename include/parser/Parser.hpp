@@ -11,36 +11,36 @@ namespace parser {
 template <typename V> using StringMap = utils::ADT::StringMap<V>;
 
 class Parser {
-  private:
-    mc::MCContext& ctx;
-    Lexer& lexer;
+private:
+  mc::MCContext& ctx;
+  Lexer& lexer;
 
-    /// speed up mnemnoic class find
-    StringMap<const mc::MCOpCode*> CacheLookUpTab;
+  /// speed up mnemnoic class find
+  StringMap<const mc::MCOpCode*> CacheLookUpTab;
 
-  public:
-    Parser(mc::MCContext& _ctx LIFETIME_BOUND, Lexer& _lexer LIFETIME_BOUND)
-        : ctx(_ctx), lexer(_lexer) {}
+public:
+  Parser(mc::MCContext& _ctx LIFETIME_BOUND, Lexer& _lexer LIFETIME_BOUND)
+      : ctx(_ctx), lexer(_lexer) {}
 
-    void parse();
+  void parse();
 
-    ~Parser() = default;
+  ~Parser() = default;
 
-  private:
-    /// this method assume mnemoic is valid
-    const mc::MCOpCode* findOpCode(StringRef mnemonic) {
-        const mc::MCOpCode** lookup = CacheLookUpTab.find(mnemonic);
+private:
+  /// this method assume mnemoic is valid
+  const mc::MCOpCode* findOpCode(StringRef mnemonic) {
+    auto lookup = CacheLookUpTab.find(mnemonic);
 
-        if (lookup != nullptr) {
-            utils_assert(*lookup, "CacheLookUpTab contains invalid key");
-            return *lookup;
-        }
-
-        const mc::MCOpCode* op = MnemonicFind(mnemonic.c_str());
-        CacheLookUpTab.insert(mnemonic, op);
-
-        return op;
+    if (lookup != nullptr) {
+      utils_assert(*lookup, "CacheLookUpTab contains invalid key");
+      return *lookup;
     }
+
+    mc::MCOpCode const* op = MnemonicFind(mnemonic.c_str());
+    CacheLookUpTab.insert(mnemonic, op);
+
+    return op;
+  }
 };
 
 } // namespace parser
