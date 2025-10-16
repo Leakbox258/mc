@@ -14,6 +14,8 @@ struct ByteStream {
 
   explicit ByteStream() : buffer(4096) {}
 
+  const unsigned char* data() const { return buffer.data(); }
+
   size_ty size() const { return buffer.size(); }
 
   void balignTo(size_ty balign) {

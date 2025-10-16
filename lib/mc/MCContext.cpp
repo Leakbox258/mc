@@ -6,6 +6,7 @@
 #include <cstring>
 #include <elf.h>
 #include <type_traits>
+#include <vector>
 
 using namespace mc;
 
@@ -37,7 +38,7 @@ void MCContext::Relo() {
 
       Rela.r_addend = expr->getExpr()->getAppend();
 
-      Elf_Rela.emplace_back(std::move(Rela));
+      Elf_Relas.emplace_back(std::move(Rela));
 
       inst->reloSym(0ll);
 
@@ -47,7 +48,7 @@ void MCContext::Relo() {
   }
 }
 
-void MCContext::Gen_ELF_Hdr() {
+void MCContext::Ehdr_Shdr() {
   auto& hdr = this->Elf_Ehdr;
 
   /// magic number
@@ -125,7 +126,7 @@ void MCContext::Gen_ELF_Hdr() {
   {
     mkAlign(8);
     Offsets.insert(".rela.text", offset);
-    offset += Elf_Rela.size() * sizeof(Elf64_Rela);
+    offset += Elf_Relas.size() * sizeof(Elf64_Rela);
   }
 
   {
@@ -147,6 +148,11 @@ void MCContext::Gen_ELF_Hdr() {
   }
 
   /// TODO: .section xxx
+
+  {
+    mkAlign(8); // I guess
+    Offsets.insert("section header table", offset);
+  }
 
   {
     /// empty section hdr
@@ -194,25 +200,92 @@ void MCContext::Gen_ELF_Hdr() {
 
     /// .rela.text
     SectionHeader(".rela.text", SHT_RELA, SHF_LINK_ORDER,
-                  Elf_Rela.size() * sizeof(Elf64_Rela), 8);
+                  Elf_Relas.size() * sizeof(Elf64_Rela), 8);
 
     /// .shstrtab
     SectionHeader(".shstrtab", SHT_STRTAB, 0, SHStrTabBuffer.size(), 1);
   }
 }
 
-void MCContext::Gen_Text() {}
+void MCContext::writein() {
 
-void MCContext::Gen_Rela_Text() {}
+  size_ty curOffset = 0;
 
-void MCContext::Gen_Data() {}
+  auto streamWriteIn = [&](const char* data, size_ty n) {
+    this->file.write(data, n);
+    curOffset += n;
+  };
 
-void MCContext::Gen_Bss() {}
+  auto padSection = [&](size_ty offset) {
+    /// pad current size to offset
+    std::vector<char> buffer(offset - curOffset, '\x00');
+    streamWriteIn(buffer.data(), buffer.size());
+  };
 
-void MCContext::Gen_StrTab() {}
+  /// elf header
+  {
+    streamWriteIn((char*)&this->Elf_Ehdr, sizeof(Elf64_Ehdr));
+  }
 
-void MCContext::Gen_SymTab() {}
+  /// .text
+  {
+    padSection(*this->Offsets.find(".text"));
 
-void MCContext::Gen_ShStrTab() {}
+    for (const auto& inst : this->Insts) {
+      auto encode = inst.makeEncoding();
+      streamWriteIn((char*)&encode, inst.isCompressed() ? 2 : 4);
+    }
+  }
 
-void MCContext::Gen_Section_Hdr_Tab() {}
+  /// .data
+  {
+    padSection(*this->Offsets.find(".data"));
+    streamWriteIn((const char*)DataBuffer.data(), DataBuffer.size());
+  }
+
+  /// .bss
+  {
+    padSection(*this->Offsets.find(".bss"));
+    std::vector<char> buffer(BssSize, '\x00');
+    streamWriteIn(buffer.data(), buffer.size());
+  }
+
+  /// .strtab
+  {
+    padSection(*this->Offsets.find(".strtab"));
+    streamWriteIn((const char*)StrTabBuffer.data(), StrTabBuffer.size());
+  }
+
+  /// .symtab
+  {
+    padSection(*this->Offsets.find(".symtab"));
+
+    for (auto symbol : this->Elf_Syms) {
+      streamWriteIn((char*)&symbol, sizeof(Elf64_Sym));
+    }
+  }
+
+  /// .rela.text
+  {
+    padSection(*this->Offsets.find(".rela.text"));
+
+    for (auto relo : this->Elf_Relas) {
+      streamWriteIn((char*)&relo, sizeof(Elf64_Rela));
+    }
+  }
+
+  /// .shstrtab
+  {
+    padSection(*this->Offsets.find(".shstrtab"));
+    streamWriteIn((const char*)SHStrTabBuffer.data(), SHStrTabBuffer.size());
+  }
+
+  /// dump section headers
+  {
+    padSection(*this->Offsets.find("section header table"));
+
+    for (auto shdr : Elf_Shdrs) {
+      streamWriteIn((char*)&shdr, sizeof(Elf64_Shdr));
+    }
+  }
+}

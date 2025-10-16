@@ -50,7 +50,7 @@ private:
   /// .rela.text
   std::set<std::string>
       ReloSymbols; // symbols cross sections or rely on extern libs
-  std::vector<Elf64_Rela> Elf_Rela;
+  std::vector<Elf64_Rela> Elf_Relas;
 
   /// .data
   StringMap<size_ty> DataVariables;
@@ -85,17 +85,9 @@ private:
   /// offset of each section
   StringMap<size_ty> Offsets;
 
-  /// binary obj rewriters
-  /// concat each elem in-order
-  void Gen_ELF_Hdr();
-  void Gen_Text();
-  void Gen_Rela_Text();
-  void Gen_Data();
-  void Gen_Bss();
-  void Gen_StrTab();
-  void Gen_SymTab();
-  void Gen_ShStrTab();
-  void Gen_Section_Hdr_Tab();
+  // elf header & section headers (table)
+  void Ehdr_Shdr();
+  void writein();
 
 private:
   size_ty incTextOffset(bool IsCompressed = false) {
