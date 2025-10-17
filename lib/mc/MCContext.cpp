@@ -74,13 +74,14 @@ void MCContext::Ehdr_Shdr() {
   hdr.e_type = ET_REL;
   hdr.e_machine = EM_RISCV;
   hdr.e_version = EV_CURRENT;
+  hdr.e_flags = EF_RISCV_RVC | EF_RISCV_FLOAT_ABI_DOUBLE;
   hdr.e_ehsize = sizeof(std::decay_t<decltype(hdr)>);
-  hdr.e_shentsize = sizeof(std::decay_t<decltype(hdr)>);
+  hdr.e_shentsize = sizeof(Elf64_Shdr);
 
   /// TODO: .section and more sections
-  /// .text .rela_text .data .bss .symtab .strtab .shstrtab
-  hdr.e_shnum = 7;
-  hdr.e_shstrndx = 6;
+  /// <void> .text .data .bss .strtab .symtab .rela_text .shstrtab
+  hdr.e_shnum = 8;
+  hdr.e_shstrndx = 7;
 
   /// estimate the offset to the section header table
   size_ty offset = 0;
@@ -133,7 +134,6 @@ void MCContext::Ehdr_Shdr() {
   {
     mkAlign(8);
     Offsets.insert(".symtab", offset);
-    offset += (TextLabels.keys().size() - 2) * sizeof(Elf64_Sym);
 
     /// begin with none
     Elf64_Sym symbol = {};
@@ -162,6 +162,8 @@ void MCContext::Ehdr_Shdr() {
 
       Elf_Syms.emplace_back(std::move(symbol));
     }
+
+    offset += (Elf_Syms.size()) * sizeof(Elf64_Sym);
   }
 
   {
@@ -188,14 +190,14 @@ void MCContext::Ehdr_Shdr() {
     offset += SHStrTabBuffer.size();
   }
 
-  /// TODO: .section xxx
-
   {
-    mkAlign(8); // I guess
+    mkAlign(8);
     Offsets.insert("section header table", offset);
   }
 
   {
+    hdr.e_shoff = offset;
+
     /// empty section hdr
     {
       Elf64_Shdr shdr = {};
@@ -203,11 +205,13 @@ void MCContext::Ehdr_Shdr() {
       Elf_Shdrs.emplace_back(std::move(shdr));
     }
 
-    auto SectionHeader = [&](StringRef name, int type, int flag, uint64_t size,
-                             int alignment) {
+    auto SectionHeader = [&](StringRef name, uint32_t type, uint64_t flag,
+                             uint64_t size, uint64_t alignment,
+                             uint32_t link = 0, uint32_t info = 0,
+                             uint64_t entsize = 0) {
       Elf64_Shdr shdr = {};
 
-      auto offset = Offsets.find(".text");
+      auto offset = Offsets.find(name);
       utils_assert(offset, "cant find offset of this section");
 
       shdr.sh_name = SHStrTabBuffer.findOffset(name);
@@ -217,6 +221,10 @@ void MCContext::Ehdr_Shdr() {
       shdr.sh_offset = *offset;
       shdr.sh_size = size;
       shdr.sh_addralign = alignment;
+
+      shdr.sh_entsize = entsize;
+      shdr.sh_link = link;
+      shdr.sh_info = info;
 
       Elf_Shdrs.emplace_back(std::move(shdr));
     };
@@ -235,13 +243,15 @@ void MCContext::Ehdr_Shdr() {
     /// .strtab
     SectionHeader(".strtab", SHT_STRTAB, 0, StrTabBuffer.size(), 1);
 
-    /// .symtab
+    /// .symtab: link to .strtab
     SectionHeader(".symtab", SHT_SYMTAB, 0,
-                  TextLabels.keys().size() * sizeof(Elf64_Sym), 8);
+                  TextLabels.keys().size() * sizeof(Elf64_Sym), 8, 4, 0,
+                  sizeof(Elf64_Sym));
 
-    /// .rela.text
-    SectionHeader(".rela.text", SHT_RELA, SHF_LINK_ORDER,
-                  Elf_Relas.size() * sizeof(Elf64_Rela), 8);
+    /// .rela.text: link to .symtab
+    SectionHeader(".rela.text", SHT_RELA, SHF_INFO_LINK,
+                  Elf_Relas.size() * sizeof(Elf64_Rela), 8, 5, 1,
+                  sizeof(Elf64_Sym));
 
     /// .shstrtab
     SectionHeader(".shstrtab", SHT_STRTAB, 0, SHStrTabBuffer.size(), 1);
@@ -249,6 +259,7 @@ void MCContext::Ehdr_Shdr() {
 }
 
 void MCContext::writein() {
+  this->Ehdr_Shdr();
 
   size_ty curOffset = 0;
 

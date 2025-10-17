@@ -12,7 +12,7 @@ struct ByteStream {
 
   std::vector<uint8_t> buffer;
 
-  explicit ByteStream() : buffer(4096) {}
+  explicit ByteStream() : buffer() { buffer.reserve(4096); }
 
   const unsigned char* data() const { return buffer.data(); }
 
@@ -45,8 +45,11 @@ struct ByteStream {
     return *this;
   }
 
-  /// for .strtab
+  /// for .strtab / .shstrtab
   size_ty findOffset(StringRef Str) const;
+
+  /// for debug
+  void dump() const;
 
 }; // namespace ADT
 } // namespace ADT

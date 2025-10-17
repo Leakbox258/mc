@@ -281,7 +281,7 @@ public:
   /// you can trait this as some kind of iter
   V* find(StringRef Key) {
     size_ty KeyLength = Key.size();
-    if (is_likely(KeyLength) < SL) {
+    if (is_likely(KeyLength < SL)) {
       for (auto& Entry : this->SmallSizeTyTable[KeyLength]) {
         if (utils::ADT::operator==(Entry.getEntry(), Key)) {
           return Entry.getValue();
@@ -304,7 +304,7 @@ public:
 
   const V* find(StringRef Key) const {
     size_ty KeyLength = Key.size();
-    if (is_likely(KeyLength) < SL) {
+    if (is_likely(KeyLength < SL)) {
       for (auto& Entry : this->SmallSizeTyTable[KeyLength]) {
         if (utils::ADT::operator==(Entry.getEntry(), Key)) {
           return Entry.getValue();

@@ -9,11 +9,12 @@ int main(int argc, char* argv[]) {
   std::ofstream OutputFile;
   std::ifstream SourceFile;
 
-  utils_assert(argc == 4, "expecting 3 arguments");
+  utils_assert(argc == 5, "expecting 4 arguments");
 
-  SourceFile = std::ifstream(argv[1]);
-  utils_assert(!std::memcmp(argv[2], "-c", 2), "expecting '-c' argument");
-  OutputFile = std::ofstream(argv[3]);
+  utils_assert(!std::memcmp(argv[1], "-c", 2), "expecting '-c' argument");
+  SourceFile = std::ifstream(argv[2]);
+  utils_assert(!std::memcmp(argv[3], "-o", 2), "expecting '-o' argument");
+  OutputFile = std::ofstream(argv[4]);
 
   std::string buffer;
   SourceFile >> buffer;

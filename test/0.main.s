@@ -10,4 +10,3 @@ main_0:
     ld fp, 0(sp)
     addi sp, sp, 16
     ret 
-

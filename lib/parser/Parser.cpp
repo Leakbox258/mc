@@ -53,8 +53,10 @@ void Parser::parse() {
     switch (token.type) {
     case TokenType::NEWLINE:
       /// Inst commit
-      curOffset = ctx.addTextInst(std::move(*curInst));
-      curInst = std::nullopt;
+      if (curInst) {
+        curOffset = ctx.addTextInst(std::move(*curInst));
+        curInst = std::nullopt;
+      }
       advance();
       break;
     case TokenType::COMMA:
