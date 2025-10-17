@@ -38,7 +38,7 @@ struct ByteStream {
   }
 
   template <size_ty Num> ByteStream& operator<<(const char (&Value)[Num]) {
-    for (int i = 0; i < Num; ++i) {
+    for (size_ty i = 0; i < Num; ++i) {
       buffer.push_back(Value[i]);
     }
 
@@ -46,21 +46,7 @@ struct ByteStream {
   }
 
   /// for .strtab
-  size_ty findOffset(StringRef Str) const {
-    size_ty offset = 0;
-    for (const auto& chr : buffer) {
-
-      if (chr == *Str.begin()) {
-        if (!std::memcmp(Str.data(), buffer.data() + offset, Str.size())) {
-          return offset;
-        }
-
-        ++offset;
-      }
-    }
-
-    utils::unreachable("cant find Str in ByteStream");
-  };
+  size_ty findOffset(StringRef Str) const;
 
 }; // namespace ADT
 } // namespace ADT

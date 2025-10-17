@@ -2,7 +2,6 @@
 #define UTILS_ADT_SMALLVECTOR
 
 #include "utils/likehood.hpp"
-#include "utils/memory.hpp"
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
@@ -18,10 +17,6 @@
 namespace utils {
 namespace ADT {
 template <typename T, unsigned N> class SmallVector;
-}
-} // namespace utils
-
-namespace {
 
 template <typename T, unsigned N> struct SmallVectorStorage {
   alignas(T) char InlineElts[N * sizeof(T)];
@@ -75,14 +70,7 @@ protected:
   }
   static void* replaceAllocation(void* NewElems, std::size_t TSize,
                                  std::size_t NewCapacity,
-                                 std::size_t VSize = 0) {
-    void* NewElemsReplace = utils::malloc(NewCapacity * TSize);
-    if (VSize) {
-      std::memcpy(NewElemsReplace, NewElems, VSize * TSize);
-    }
-    free(NewElems);
-    return NewElemsReplace;
-  }
+                                 std::size_t VSize = 0);
 
   /// helper when use `grow()`
   void* malloc4grow(void* FirstEl, std::size_t MinSize, std::size_t TSize,
@@ -107,44 +95,6 @@ protected:
   }
 };
 
-void* SmallVectorBase::malloc4grow(void* FirstElem, std::size_t MinSize,
-                                   std::size_t TSize,
-                                   std::size_t& NewCapacity) {
-  NewCapacity = getNewCapacity(MinSize, this->capacity());
-  // Even if capacity is not 0 now, if the vector was originally created with
-  // capacity 0, it's possible for the malloc to return FirstEl.
-  void* NewElems = std::malloc(NewCapacity * TSize);
-
-  if (utils::is_unlikely(NewElems == FirstElem)) {
-    // get an another piece of mem, avoid memcpy to itself
-    NewElems = replaceAllocation(NewElems, TSize, NewCapacity);
-  }
-  return NewElems;
-}
-
-void SmallVectorBase::grow_pod(void* FirstElem, std::size_t MinSize,
-                               std::size_t TSize) {
-  size_t NewCapacity = getNewCapacity(MinSize, this->capacity());
-  void* NewElems;
-  if (this->BeginWith == FirstElem) {
-    NewElems = utils::malloc(NewCapacity * TSize);
-    if (NewElems == FirstElem) {
-      NewElems = replaceAllocation(NewElems, TSize, NewCapacity);
-    }
-
-    // Copy the elements over.  No need to run dtors on PODs.
-    std::memcpy(NewElems, this->BeginWith, size() * TSize);
-  } else {
-    // If this wasn't grown from the inline copy, grow the allocated space.
-    NewElems = utils::realloc(this->BeginWith, NewCapacity * TSize);
-    if (NewElems == FirstElem) {
-      NewElems = replaceAllocation(NewElems, TSize, NewCapacity, size());
-    }
-  }
-
-  this->set_allocation_range(NewElems, NewCapacity);
-}
-
 /// view of the layout of the instantce vec
 template <class T, typename = void> struct SmallVectorAlignmentAndSize {
   alignas(SmallVectorBase) char Base[sizeof(SmallVectorBase)];
@@ -157,26 +107,26 @@ protected:
   /// skip the offset of the metadata of vec
   /// so this method always get the ptr to the first elem on stack,
   /// no matter it exists or doesnt
-  constexpr void* getFirstElement() const {
+  constexpr void* getFirstEl() const {
     return const_cast<void*>(reinterpret_cast<const void*>(
         reinterpret_cast<const char*>(this) +
         offsetof(SmallVectorAlignmentAndSize<T>, FirstElement)));
   }
 
   SmallVectorTemplateCommon(std::size_t _Size)
-      : SmallVectorBase(this->getFirstElement(), _Size) {}
+      : SmallVectorBase(this->getFirstEl(), _Size) {}
 
   void grow_pod(std::size_t MinSize, std::size_t TSize) {
-    SmallVectorBase::grow_pod(this->getFirstElement(), MinSize, TSize);
+    SmallVectorBase::grow_pod(this->getFirstEl(), MinSize, TSize);
   }
 
   /// check if BeginWith eq getFirtstEl()
   /// if obj(BeginWith) is migrate to heap, the result is false
-  bool isSmall() const { return this->getFirstElement() == this->BeginWith; }
+  bool isSmall() const { return this->getFirstEl() == this->BeginWith; }
 
   /// reset as small
   void resetToSmall() {
-    this->BeginWith = this->getFirstElement();
+    this->BeginWith = this->getFirstEl();
     this->Size = this->Capacity = 0;
   }
 
@@ -390,7 +340,7 @@ protected:
 
   T* malloc4grow(std::size_t MinSize, std::size_t& NewCapacity) {
     return static_cast<T*>(SmallVectorBase::malloc4grow(
-        this->getFirstElement(), MinSize, sizeof(T), NewCapacity));
+        this->getFirstEl(), MinSize, sizeof(T), NewCapacity));
   }
 
   void moveElements4Grow(T* NewElems) {
@@ -1018,17 +968,11 @@ SmallVectorImpl<T>& SmallVectorImpl<T>::operator=(SmallVectorImpl<T>&& RHS) {
   return *this;
 }
 
-} // namespace
-
-namespace utils {
-
-namespace ADT {
-
 template <typename T> class ArrayRef;
 template <typename IterT> class iterator_range;
 
 template <typename T, unsigned N = CalculatePredferInlinedElems<T>::value>
-class SmallVector : public SmallVectorStorage<T, N>, public SmallVectorImpl<T> {
+class SmallVector : public SmallVectorImpl<T>, public SmallVectorStorage<T, N> {
 public:
   SmallVector() : SmallVectorImpl<T>(N) {}
   ~SmallVector() { this->destroy_range(this->begin(), this->end()); }
@@ -1114,7 +1058,6 @@ public:
 /// SmallVector Builder
 
 } // namespace ADT
-
-}; // namespace utils
+} // namespace utils
 
 #endif

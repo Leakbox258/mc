@@ -203,7 +203,7 @@ public:
       : StringMap() {
 
     for (auto [Str, Val] : list) {
-      utils_assert(!this->insert(Str, Val), "StringRef Key is conflicted");
+      utils_assert(this->insert(Str, Val), "StringRef Key is conflicted");
     }
   }
 

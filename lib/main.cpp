@@ -7,13 +7,18 @@
 
 int main(int argc, char* argv[]) {
   std::ofstream OutputFile;
+  std::ifstream SourceFile;
 
   utils_assert(argc == 4, "expecting 3 arguments");
 
-  utils_assert(std::memcmp(argv[2], "-c", 2), "expecting '-c' argument");
+  SourceFile = std::ifstream(argv[1]);
+  utils_assert(!std::memcmp(argv[2], "-c", 2), "expecting '-c' argument");
   OutputFile = std::ofstream(argv[3]);
 
-  auto Lexer = parser::Lexer(argv[1]); // source file
+  std::string buffer;
+  SourceFile >> buffer;
+
+  auto Lexer = parser::Lexer(buffer); // source file
   auto Ctx = mc::MCContext(OutputFile);
   auto Parser = parser::Parser(Ctx, Lexer);
 

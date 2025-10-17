@@ -28,7 +28,10 @@ include_directories(include)
 
 aux_source_directory(lib/mc MC)
 aux_source_directory(lib/parser PARSER)
+aux_source_directory(lib/utils UTILS)
+aux_source_directory(lib/utils/ADT UTILS_ADT)
 
-set(ASSEMBLER ${MC} ${PARSER})
+set(ASSEMBLER ${MC} ${PARSER} ${UTILS} ${UTILS_ADT})
 
 add_executable(mc lib/main.cpp ${ASSEMBLER})
+add_executable(stl lib/STL.cpp ${ASSEMBLER})

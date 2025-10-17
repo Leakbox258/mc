@@ -28,19 +28,7 @@ public:
 
 private:
   /// this method assume mnemoic is valid
-  const mc::MCOpCode* findOpCode(StringRef mnemonic) {
-    auto lookup = CacheLookUpTab.find(mnemonic);
-
-    if (lookup != nullptr) {
-      utils_assert(*lookup, "CacheLookUpTab contains invalid key");
-      return *lookup;
-    }
-
-    mc::MCOpCode const* op = MnemonicFind(mnemonic.c_str());
-    CacheLookUpTab.insert(mnemonic, op);
-
-    return op;
-  }
+  const mc::MCOpCode* findOpCode(StringRef mnemonic);
 };
 
 } // namespace parser

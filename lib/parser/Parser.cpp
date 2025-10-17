@@ -276,12 +276,12 @@ void Parser::parse() {
                                       .Case(".data", ".bss", ".text", true)
                                       .Default(false);
 
-        if (isSectionDirective) {
+        if (isSectionDirective && !DirectiveStack.empty()) {
           /// end of the last section & start of the new section
           DirectiveStack.pop_back();
         }
 
-        DirectiveStack.emplace_back(token.lexeme);
+        DirectiveStack.push_back(token.lexeme);
         advance();
       }
       break;
@@ -327,4 +327,18 @@ void Parser::parse() {
       utils::unreachable("unkwnow type of current token");
     }
   }
+}
+
+const mc::MCOpCode* Parser::findOpCode(StringRef mnemonic) {
+  auto lookup = CacheLookUpTab.find(mnemonic);
+
+  if (lookup != nullptr) {
+    utils_assert(*lookup, "CacheLookUpTab contains invalid key");
+    return *lookup;
+  }
+
+  mc::MCOpCode const* op = MnemonicFind(mnemonic.c_str());
+  CacheLookUpTab.insert(mnemonic, op);
+
+  return op;
 }

@@ -18,7 +18,7 @@ private:
   std::optional<T> Result;
 
 public:
-  explicit constexpr StringSwitch(StringRef S) : Str(S), Result() {}
+  explicit constexpr StringSwitch(StringRef S) : Str(S), Result(std::nullopt) {}
 
   /// forbidden copy
   StringSwitch(const StringSwitch&) = delete;
@@ -70,9 +70,9 @@ public:
 
     if (!Result && CaseImpl<0>(TupleArgs)) {
       if constexpr (std::is_same_v<std::decay_t<decltype(LastArg)>, T>) {
-        *Result = std::move(LastArg);
+        Result = std::move(LastArg);
       } else {
-        *Result = LastArg(this->Str);
+        Result = LastArg(this->Str);
       }
     }
 

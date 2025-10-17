@@ -5,6 +5,7 @@
 #include "SmallVector.hpp"
 #include "iterator_range.hpp"
 #include "utils/macro.hpp"
+#include "utils/memory.hpp"
 #include <array>
 #include <cassert>
 #include <cstddef>
