@@ -93,6 +93,7 @@ public:
     MCOperand op;
 
     op.Reg = std::move(_Reg);
+    op.Kind = OpTy::kReg;
     return op;
   }
 
@@ -100,6 +101,7 @@ public:
     MCOperand op;
 
     op.Imm = std::move(_Imm);
+    op.Kind = OpTy::kImme;
     return op;
   }
 
@@ -107,6 +109,7 @@ public:
     MCOperand op;
 
     op.SFPImm = std::move(_SFPImm);
+    op.Kind = OpTy::kSFPImme;
     return op;
   }
 
@@ -114,6 +117,7 @@ public:
     MCOperand op;
 
     op.DFPImm = std::move(_DFPImm);
+    op.Kind = OpTy::kDFPImme;
     return op;
   }
 
@@ -121,6 +125,7 @@ public:
     MCOperand op;
 
     op.Expr = std::move(_Expr);
+    op.Kind = OpTy::kExpr;
     return op;
   }
 
@@ -128,6 +133,7 @@ public:
     MCOperand op;
 
     op.Inst = std::move(_Inst);
+    op.Kind = OpTy::kInst;
     return op;
   }
 

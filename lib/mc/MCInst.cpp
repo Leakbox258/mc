@@ -5,7 +5,6 @@
 #include "utils/logger.hpp"
 #include "utils/macro.hpp"
 #include "utils/misc.hpp"
-#include <algorithm>
 #include <asm-generic/errno.h>
 #include <cstdint>
 #include <elf.h>
@@ -88,11 +87,11 @@ uint32_t MCInst::makeEncoding() const {
 
   struct Bits {
     uint32_t bits = 0;
-    unsigned length;
+    unsigned len = 0;
 
-    void add(uint32_t elem, unsigned len) {
-      bits |= (elem & ((1u << len) - 1)) << length;
-      length += len;
+    void add(uint32_t elem, unsigned length) {
+      bits |= (elem & ((1u << length) - 1)) << len;
+      len += length;
     }
   };
 
@@ -103,7 +102,8 @@ uint32_t MCInst::makeEncoding() const {
 
     switch (encode.kind) {
     case EnCoding::kInvalid:
-      utils::unreachable("invalid encoding");
+      /// typically, reach the end of the pattern array
+      continue;
     case EnCoding::kStatic:
       inst.add(*encode.static_pattern, length);
       break;
@@ -130,8 +130,14 @@ uint32_t MCInst::makeEncoding() const {
     case EnCoding::kUImm:
       auto immOp = this->findImmOp();
 
+      unsigned tmp_len = 0;
       for (auto [high, low] : *encode.bit_range) {
+        if (tmp_len == length) {
+          break;
+        }
+
         inst.add(immOp.getImmSlice(high, low), high - low + 1);
+        tmp_len += high - low + 1;
       }
 
       break;
@@ -139,9 +145,9 @@ uint32_t MCInst::makeEncoding() const {
   }
 
   if (this->isCompressed()) {
-    utils_assert(inst.length == 16, "encoding check failed");
+    utils_assert(inst.len == 16, "encoding check failed");
   } else {
-    utils_assert(inst.length == 32, "encoding check failed");
+    utils_assert(inst.len == 32, "encoding check failed");
   }
 
   return inst.bits;

@@ -11,11 +11,12 @@ add_compile_options("-fno-rtti")
 add_compile_options("-Wall")
 add_compile_options("-Wextra")
 
-option(ENABLE_ASAN "Enable AddressSanitizer" ON)
-
 if(${CMAKE_BUILD_TYPE} MATCHES Debug)
-        add_compile_options("-g" "-fstandalone-debug" "-fsanitize=address" "-fno-omit-frame-pointer")
-        add_link_options("-rdynamic" "-fsanitize=address")
+	add_compile_options("-g" "-fstandalone-debug" "-fno-omit-frame-pointer")
+	add_link_options("-rdynamic")
+	option(ENABLE_ASAN "Enable AddressSanitizer" OFF)			
+elseif(${CMAKE_BUILD_TYPE} MATCHES ASAN)
+	option(ENABLE_ASAN "Enable AddressSanitizer" ON)			
 endif()
 
 if(ENABLE_ASAN)

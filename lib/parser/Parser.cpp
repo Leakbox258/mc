@@ -40,7 +40,6 @@ void Parser::parse() {
   };
 
   auto JmpBrHelper = [&](const StringRef& label) {
-    utils_assert(curInst, "expect curInst to be valid");
     ctx.addReloInst(&(*curInst), label.str());
 
     /// 12 bits offset padding
@@ -81,8 +80,39 @@ void Parser::parse() {
     case TokenType::IDENTIFIER:
       /// symbol used without modifiers
       /// this is often branch/jump insts or
+      /// .global xxx
       /// TODO: pseudo instructions
-      JmpBrHelper(token.lexeme);
+      if (curInst) {
+        JmpBrHelper(token.lexeme);
+      } else {
+        using Ndx = MCContext::NdxSection;
+
+        auto isExist =
+            !StringSwitch<bool>(DirectiveStack.back())
+                 .Case(".global", ".globl",
+                       [&](auto&& _) {
+                         const auto& section =
+                             DirectiveStack[DirectiveStack.size() - 2];
+
+                         if (section == ".data") {
+                           ctx.addDataVar(token.lexeme);
+                           return ctx.addReloSym(token.lexeme, Ndx::data);
+                         } else if (section == ".bss") {
+                           ctx.addBssVar(token.lexeme);
+                           return ctx.addReloSym(token.lexeme, Ndx::bss);
+                         } else if (section == ".text") {
+                           return ctx.addReloSym(token.lexeme, Ndx::text);
+                         }
+
+                         utils::unreachable(
+                             "cant match the section of this label");
+                       })
+                 .Error();
+
+        utils_assert(!isExist, "global symbol redefinition");
+
+        DirectiveStack.pop_back(); // .global, .globl
+      }
       advance();
       break;
     case TokenType::INTEGER: {
@@ -250,7 +280,8 @@ void Parser::parse() {
       advance();
       break;
     case TokenType::INSTRUCTION: {
-      *curInst = MCInst(token.lexeme, token.loc, curOffset);
+      /// must empty
+      curInst = MCInst(token.lexeme, token.loc, curOffset);
 
       auto [instAlign, padInst] =
           (*curInst).isCompressed()
@@ -284,42 +315,15 @@ void Parser::parse() {
         }
 
         DirectiveStack.push_back(token.lexeme);
-        advance();
       }
+      advance();
       break;
     case TokenType::LABEL_DEFINITION:
 
-      if (DirectiveStack.back() == ".text") {
-        ctx.addTextLabel(token.lexeme);
-      } else {
-        using Ndx = MCContext::NdxSection;
+      utils_assert(DirectiveStack.back() == ".text",
+                   "expecting ddefine label in .text section");
+      ctx.addTextLabel(token.lexeme);
 
-        auto isExist =
-            !StringSwitch<bool>(DirectiveStack.back())
-                 .Case(".global", ".globl",
-                       [&](auto&& _) {
-                         const auto& section =
-                             DirectiveStack[DirectiveStack.size() - 2];
-
-                         if (section == ".data") {
-                           ctx.addDataVar(token.lexeme);
-                           return ctx.addReloSym(token.lexeme, Ndx::data);
-                         } else if (section == ".bss") {
-                           ctx.addBssVar(token.lexeme);
-                           return ctx.addReloSym(token.lexeme, Ndx::bss);
-                         } else if (section == ".text") {
-                           return ctx.addReloSym(token.lexeme, Ndx::text);
-                         }
-
-                         utils::unreachable(
-                             "cant match the section of this label");
-                       })
-                 .Error();
-
-        utils_assert(!isExist, "global symbol redefinition");
-
-        DirectiveStack.pop_back(); // .global, .globl
-      }
       advance();
       break;
     case TokenType::STRING_LITERAL:

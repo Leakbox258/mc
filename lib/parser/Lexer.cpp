@@ -118,7 +118,7 @@ Token Lexer::scanIdentifier() {
     advance();
   }
 
-  std::string lexeme = m_source.slice(start, m_cursor - start).str();
+  std::string lexeme = m_source.slice(start, m_cursor).str();
 
   std::transform(lexeme.begin(), lexeme.end(), lexeme.begin(),
                  [](unsigned char c) { return std::tolower(c); });
@@ -127,7 +127,7 @@ Token Lexer::scanIdentifier() {
   if (peek() == ':') {
     advance(); // consume the ':'
     return makeToken(TokenType::LABEL_DEFINITION,
-                     m_source.slice(start, m_cursor - start));
+                     m_source.slice(start, m_cursor));
   }
 
   if (MnemonicContain(lexeme.c_str())) {
@@ -148,8 +148,7 @@ Token Lexer::scanNumber() {
     while (isxdigit(peek())) {
       advance();
     }
-    return makeToken(TokenType::HEX_INTEGER,
-                     m_source.slice(start, m_cursor - start));
+    return makeToken(TokenType::HEX_INTEGER, m_source.slice(start, m_cursor));
   }
 
   // Handle negative numbers at the start
@@ -161,17 +160,18 @@ Token Lexer::scanNumber() {
 
   // Decimal
   bool dot = false;
-  while (isdigit(peek()) || !dot) {
+  while (isdigit(peek())) {
+
+    advance();
 
     if (utils::is_unlikely(peek() == '.')) {
       dot = true;
+      advance(); // skip '.'
     }
-
-    advance();
   }
 
   return makeToken(dot ? TokenType::FLOAT : TokenType::INTEGER,
-                   m_source.slice(start, m_cursor - start));
+                   m_source.slice(start, m_cursor));
 }
 
 Token Lexer::scanString() {
@@ -189,7 +189,7 @@ Token Lexer::scanString() {
   }
 
   advance(); // Consume the closing quote
-  StringRef lexeme = m_source.slice(start, m_cursor - start - 1);
+  StringRef lexeme = m_source.slice(start, m_cursor - 1);
   return makeToken(TokenType::STRING_LITERAL, lexeme);
 }
 
@@ -207,18 +207,16 @@ Token Lexer::nextToken() {
     while (peek() != '(') {
       advance();
     }
-    return makeToken(TokenType::MODIFIERS,
-                     m_source.slice(start, m_cursor - start));
+    return makeToken(TokenType::MODIFIERS, m_source.slice(start, m_cursor));
   }
 
   if (isalpha(c) || c == '_' || c == '.') {
-    if (c == '.') { // Must be a directive
+    if (c == '.') { // assume to be a directive
       size_t start = m_cursor - 1;
       while (isalnum(peek()) || peek() == '_') {
         advance();
       }
-      return makeToken(TokenType::DIRECTIVE,
-                       m_source.slice(start, m_cursor - start));
+      return makeToken(TokenType::DIRECTIVE, m_source.slice(start, m_cursor));
     }
     return scanIdentifier();
   }

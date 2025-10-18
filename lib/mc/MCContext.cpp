@@ -121,11 +121,11 @@ void MCContext::Ehdr_Shdr() {
     StrTabBuffer << '\x00';
 
     for (const auto& [relo_sym, ndx] : ReloSymbols) {
-      StrTabBuffer << relo_sym.c_str() << '\x00';
+      StrTabBuffer << relo_sym << '\x00';
     }
 
     for (const auto& label : TextLabels.keys()) {
-      StrTabBuffer << label.c_str() << '\x00';
+      StrTabBuffer << label << '\x00';
     }
 
     offset += StrTabBuffer.size();

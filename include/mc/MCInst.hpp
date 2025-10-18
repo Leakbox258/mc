@@ -30,12 +30,12 @@ public:
   MCInst() = delete;
   explicit MCInst(const MCOpCode* _OpCode LIFETIME_BOUND, Location _Loc,
                   size_ty _Offset)
-      : OpCode(_OpCode), Loc(_Loc), Offset(_Offset), Operands(6) {}
+      : OpCode(_OpCode), Loc(_Loc), Offset(_Offset) {}
 
   explicit MCInst(const StringRef& _OpCode LIFETIME_BOUND, Location _Loc,
                   size_ty _Offset)
       : OpCode(parser::MnemonicFind(_OpCode.c_str())), Loc(_Loc),
-        Offset(_Offset), Operands(6) {}
+        Offset(_Offset) {}
 
   [[nodiscard]] decltype(Operands)::size_ty getOpSize() const {
     return Operands.size();

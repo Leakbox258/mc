@@ -5,6 +5,7 @@
 #include "utils/ADT/StringRef.hpp"
 #include "utils/ADT/StringSwitch.hpp"
 #include "utils/misc.hpp"
+#include <cassert>
 #include <cstdint>
 #include <optional>
 #include <tuple>
@@ -61,7 +62,7 @@ struct EnCoding {
   };
 
   EnCodeTy kind = kInvalid;
-  unsigned length;
+  unsigned length = 0;
 
   /// TODO: it's more reasonable to split the encodings
   std::optional<std::array<std::pair<uint16_t, uint16_t>, 8>> bit_range;
@@ -84,16 +85,20 @@ private:
     for (auto rit = concat_range.rbegin(); rit != concat_range.rend(); ++rit) {
       auto& range = *rit;
 
+      if (range.empty()) {
+        continue;
+      }
+
       /// NOTE: for constexpr, std::array need a more
       /// large range
       auto ranges = range.split<8>(':');
 
       // `low` will probably be empty
       auto high = ranges[0];
-      auto low = ranges.size() == 2 ? ranges[1] : ranges[0];
+      auto low = ranges[1].empty() ? ranges[0] : ranges[1];
 
-      auto low_bit = low.empty() ? -1 : utils::stoi(low.c_str(), low.size());
       auto high_bit = utils::stoi(high.c_str(), high.size());
+      auto low_bit = utils::stoi(low.c_str(), low.size());
 
       bit_range[idx++] = {high_bit, low_bit};
       length += high_bit - low_bit + 1;
@@ -126,6 +131,10 @@ public:
 
       auto& raw_pattern = *raw_pattern_it;
 
+      if (raw_pattern.empty()) {
+        continue;
+      }
+
       EnCoding encoding =
           StringSwitch<EnCoding>(raw_pattern)
               .BeginWith("offset",
@@ -133,7 +142,7 @@ public:
                            /// NOTE: for constexpr, std::array need a
                            /// more large range than 2 which is more ideal
                            auto [bit_range, length] =
-                               parseBitRange(Str.slice(7, Str.size() - 1));
+                               parseBitRange(Str.slice(7, Str.size() - 2));
 
                            return EnCoding{EnCoding::kImm, length, bit_range,
                                            std::nullopt};
@@ -145,7 +154,7 @@ public:
                            /// NOTE: for constexpr, std::array need a
                            /// more large range than 2 which is more ideal
                            auto [bit_range, length] =
-                               parseBitRange(Str.slice(4, Str.size() - 1));
+                               parseBitRange(Str.slice(4, Str.size() - 2));
 
                            return EnCoding{EnCoding::kImm, length, bit_range,
                                            std::nullopt};
@@ -156,7 +165,7 @@ public:
                            /// NOTE: for constexpr, std::array need a
                            /// more large range than 2 which is more ideal
                            auto [bit_range, length] =
-                               parseBitRange(Str.slice(6, Str.size() - 1));
+                               parseBitRange(Str.slice(6, Str.size() - 2));
 
                            return EnCoding{EnCoding::kImm, length, bit_range,
                                            std::nullopt};
@@ -167,7 +176,7 @@ public:
                            /// NOTE: for constexpr, std::array need a
                            /// more large range than 2 which is more ideal
                            auto [bit_range, length] =
-                               parseBitRange(Str.slice(5, Str.size() - 1));
+                               parseBitRange(Str.slice(5, Str.size() - 2));
 
                            return EnCoding{EnCoding::kImm, length, bit_range,
                                            std::nullopt};
@@ -176,7 +185,7 @@ public:
                          [](const StringRef& Str) -> EnCoding {
                            // [2:0]
                            auto [bit_range, length] =
-                               parseBitRange(Str.slice(4, Str.size() - 1));
+                               parseBitRange(Str.slice(4, Str.size() - 2));
 
                            return EnCoding{EnCoding::kRd_short, length,
                                            bit_range, std::nullopt};
@@ -185,7 +194,7 @@ public:
                          [](const StringRef& Str) -> EnCoding {
                            // [4:0]
                            auto [bit_range, length] =
-                               parseBitRange(Str.slice(3, Str.size() - 1));
+                               parseBitRange(Str.slice(3, Str.size() - 2));
 
                            return EnCoding{EnCoding::kRd, length, bit_range,
                                            std::nullopt};
@@ -197,9 +206,9 @@ public:
 
                     // [4:0]
                     auto [bit_range, length] = parseBitRange(Str.slice(
-                        *(Str.c_str() + 3) == '_' ? 5 : 4, Str.size() - 1));
+                        *(Str.c_str() + 3) == '_' ? 5 : 4, Str.size() - 2));
 
-                    uint16_t kind = idx + *(Str.c_str() + 3) == '_' ? 8 : 4;
+                    uint16_t kind = idx + (*(Str.c_str() + 3) == '_' ? 8 : 4);
 
                     return EnCoding{EnCoding::EnCodeTy(kind), length, bit_range,
                                     std::nullopt};
@@ -208,7 +217,7 @@ public:
                          [](const StringRef& Str) -> EnCoding {
                            // [2:0]
                            auto [bit_range, length] =
-                               parseBitRange(Str.slice(3, Str.size() - 1));
+                               parseBitRange(Str.slice(3, Str.size() - 2));
 
                            return EnCoding{EnCoding::kRd, length, bit_range,
                                            std::nullopt};
@@ -217,7 +226,7 @@ public:
                          [](const StringRef& Str) -> EnCoding {
                            // [3:0]
                            auto [bit_range, length] =
-                               parseBitRange(Str.slice(5, Str.size() - 1));
+                               parseBitRange(Str.slice(5, Str.size() - 2));
 
                            return EnCoding{EnCoding::kMemFence, length,
                                            bit_range, std::nullopt};
@@ -226,7 +235,7 @@ public:
                          [](const StringRef& Str) -> EnCoding {
                            // [3:0]
                            auto [bit_range, length] =
-                               parseBitRange(Str.slice(5, Str.size() - 1));
+                               parseBitRange(Str.slice(5, Str.size() - 2));
 
                            return EnCoding{EnCoding::kMemFence, length,
                                            bit_range, std::nullopt};
@@ -243,9 +252,9 @@ public:
 };
 
 #define ASM(name, pattern)                                                     \
-  inline constexpr char name##_[] = #name;                                     \
-  inline constexpr char name##_Pattern_[] = #pattern;                          \
-  static constexpr MCOpCode name{name##_, name##_Pattern_};
+  inline constexpr char _##name[] = #name;                                     \
+  inline constexpr char _##name##_Pattern[] = #pattern;                        \
+  static constexpr MCOpCode name{_##name, _##name##_Pattern};
 
 #define DOIT(name, pattern) ASM(name, pattern)
 #include "RISCV.def"

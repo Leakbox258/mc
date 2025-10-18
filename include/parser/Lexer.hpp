@@ -13,7 +13,7 @@ enum class TokenType {
   END_OF_FILE,
   NEWLINE,
 
-  IDENTIFIER,  // e.g., my_label (when used as an operand in an inst)
+  IDENTIFIER,  // e.g., my_label (.global) my_label
   INTEGER,     // e.g., 123, -42
   HEX_INTEGER, // e.g., 0xdeadbeef
   FLOAT,       // e.g., 1.5

@@ -68,7 +68,7 @@ private:
 
   /// .bss
   StringMap<size_ty> BssVariables;
-  size_ty BssSize;
+  size_ty BssSize = 0;
 
   /// TODO: add .symtab section
   std::vector<Elf64_Sym> Elf_Syms;
