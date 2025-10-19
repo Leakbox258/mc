@@ -99,6 +99,7 @@ uint32_t MCInst::makeEncoding() const {
 
   for (auto& encode : pattern) {
     auto length = encode.length;
+    auto highest = encode.highest;
 
     switch (encode.kind) {
     case EnCoding::kInvalid:
@@ -128,15 +129,19 @@ uint32_t MCInst::makeEncoding() const {
     case EnCoding::kImm:
     case EnCoding::kNzImm:
     case EnCoding::kUImm:
-      auto immOp = this->findImmOp();
+      auto immOp = this->findGImmOp();
 
       unsigned tmp_len = 0;
+      int64_t gimm =
+          utils::signIntCompress(immOp.getGImm(), highest + 1); // expecting len
+
       for (auto [high, low] : *encode.bit_range) {
         if (tmp_len == length) {
           break;
         }
 
-        inst.add(immOp.getImmSlice(high, low), high - low + 1);
+        auto immSlice = utils::signIntSlice(gimm, high, low);
+        inst.add(immSlice, high - low + 1);
         tmp_len += high - low + 1;
       }
 

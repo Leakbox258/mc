@@ -63,6 +63,7 @@ struct EnCoding {
 
   EnCodeTy kind = kInvalid;
   unsigned length = 0;
+  unsigned highest = 0;
 
   /// TODO: it's more reasonable to split the encodings
   std::optional<std::array<std::pair<uint16_t, uint16_t>, 8>> bit_range;
@@ -72,7 +73,7 @@ struct EnCoding {
 struct MCOpCode {
 private:
   constexpr static std::tuple<std::array<std::pair<uint16_t, uint16_t>, 8>,
-                              unsigned>
+                              unsigned, unsigned>
   parseBitRange(StringRef BitRange) {
     // 4:0
     // 20|10:1|11|19:12
@@ -80,6 +81,7 @@ private:
 
     std::array<std::pair<uint16_t, uint16_t>, 8> bit_range{};
     unsigned length = 0;
+    unsigned highest = 0;
     unsigned idx = 0;
 
     for (auto rit = concat_range.rbegin(); rit != concat_range.rend(); ++rit) {
@@ -102,9 +104,10 @@ private:
 
       bit_range[idx++] = {high_bit, low_bit};
       length += high_bit - low_bit + 1;
+      highest = static_cast<unsigned>(high_bit) > highest ? high_bit : highest;
     }
 
-    return {bit_range, length};
+    return {bit_range, length, highest};
   }
 
 public:
@@ -141,11 +144,11 @@ public:
                          [](const StringRef& Str) -> EnCoding {
                            /// NOTE: for constexpr, std::array need a
                            /// more large range than 2 which is more ideal
-                           auto [bit_range, length] =
+                           auto [bit_range, length, highest] =
                                parseBitRange(Str.slice(7, Str.size() - 2));
 
-                           return EnCoding{EnCoding::kImm, length, bit_range,
-                                           std::nullopt};
+                           return EnCoding{EnCoding::kImm, length, highest,
+                                           bit_range, std::nullopt};
                          })
               .BeginWith("imm",
                          [this](const StringRef& Str) -> EnCoding {
@@ -153,51 +156,51 @@ public:
 
                            /// NOTE: for constexpr, std::array need a
                            /// more large range than 2 which is more ideal
-                           auto [bit_range, length] =
+                           auto [bit_range, length, highest] =
                                parseBitRange(Str.slice(4, Str.size() - 2));
 
-                           return EnCoding{EnCoding::kImm, length, bit_range,
-                                           std::nullopt};
+                           return EnCoding{EnCoding::kImm, length, highest,
+                                           bit_range, std::nullopt};
                          })
               .BeginWith("nzimm",
                          [this](const StringRef& Str) -> EnCoding {
                            ++imm_distribute;
                            /// NOTE: for constexpr, std::array need a
                            /// more large range than 2 which is more ideal
-                           auto [bit_range, length] =
+                           auto [bit_range, length, highest] =
                                parseBitRange(Str.slice(6, Str.size() - 2));
 
-                           return EnCoding{EnCoding::kImm, length, bit_range,
-                                           std::nullopt};
+                           return EnCoding{EnCoding::kImm, length, highest,
+                                           bit_range, std::nullopt};
                          })
               .BeginWith("uimm",
                          [this](const StringRef& Str) -> EnCoding {
                            ++imm_distribute;
                            /// NOTE: for constexpr, std::array need a
                            /// more large range than 2 which is more ideal
-                           auto [bit_range, length] =
+                           auto [bit_range, length, highest] =
                                parseBitRange(Str.slice(5, Str.size() - 2));
 
-                           return EnCoding{EnCoding::kImm, length, bit_range,
-                                           std::nullopt};
+                           return EnCoding{EnCoding::kImm, length, highest,
+                                           bit_range, std::nullopt};
                          })
               .BeginWith("rd_",
                          [](const StringRef& Str) -> EnCoding {
                            // [2:0]
-                           auto [bit_range, length] =
+                           auto [bit_range, length, highest] =
                                parseBitRange(Str.slice(4, Str.size() - 2));
 
-                           return EnCoding{EnCoding::kRd_short, length,
+                           return EnCoding{EnCoding::kRd_short, length, highest,
                                            bit_range, std::nullopt};
                          })
               .BeginWith("rd",
                          [](const StringRef& Str) -> EnCoding {
                            // [4:0]
-                           auto [bit_range, length] =
+                           auto [bit_range, length, highest] =
                                parseBitRange(Str.slice(3, Str.size() - 2));
 
-                           return EnCoding{EnCoding::kRd, length, bit_range,
-                                           std::nullopt};
+                           return EnCoding{EnCoding::kRd, length, highest,
+                                           bit_range, std::nullopt};
                          })
               .BeginWith(
                   "rs",
@@ -205,44 +208,44 @@ public:
                     int idx = utils::stoi(Str.c_str() + 2, 1); // rsx
 
                     // [4:0]
-                    auto [bit_range, length] = parseBitRange(Str.slice(
+                    auto [bit_range, length, highest] = parseBitRange(Str.slice(
                         *(Str.c_str() + 3) == '_' ? 5 : 4, Str.size() - 2));
 
-                    uint16_t kind = idx + (*(Str.c_str() + 3) == '_' ? 8 : 4);
+                    uint16_t kind = idx + (*(Str.c_str() + 3) == '_' ? 9 : 5);
 
-                    return EnCoding{EnCoding::EnCodeTy(kind), length, bit_range,
-                                    std::nullopt};
+                    return EnCoding{EnCoding::EnCodeTy(kind), length, highest,
+                                    bit_range, std::nullopt};
                   })
               .BeginWith("rm",
                          [](const StringRef& Str) -> EnCoding {
                            // [2:0]
-                           auto [bit_range, length] =
+                           auto [bit_range, length, highest] =
                                parseBitRange(Str.slice(3, Str.size() - 2));
 
-                           return EnCoding{EnCoding::kRd, length, bit_range,
-                                           std::nullopt};
+                           return EnCoding{EnCoding::kRd, length, highest,
+                                           bit_range, std::nullopt};
                          })
               .BeginWith("pred",
                          [](const StringRef& Str) -> EnCoding {
                            // [3:0]
-                           auto [bit_range, length] =
+                           auto [bit_range, length, highest] =
                                parseBitRange(Str.slice(5, Str.size() - 2));
 
-                           return EnCoding{EnCoding::kMemFence, length,
+                           return EnCoding{EnCoding::kMemFence, length, highest,
                                            bit_range, std::nullopt};
                          })
               .BeginWith("succ",
                          [](const StringRef& Str) -> EnCoding {
                            // [3:0]
-                           auto [bit_range, length] =
+                           auto [bit_range, length, highest] =
                                parseBitRange(Str.slice(5, Str.size() - 2));
 
-                           return EnCoding{EnCoding::kMemFence, length,
+                           return EnCoding{EnCoding::kMemFence, length, highest,
                                            bit_range, std::nullopt};
                          })
               .Default([](const StringRef& Str) -> EnCoding {
                 return EnCoding{
-                    EnCoding::kStatic, static_cast<unsigned int>(Str.size()),
+                    EnCoding::kStatic, static_cast<unsigned int>(Str.size()), 0,
                     std::nullopt, utils::stoi(Str.c_str(), Str.size(), 2)};
               });
 

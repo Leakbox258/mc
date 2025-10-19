@@ -136,7 +136,7 @@ private:
     utils::unreachable("cant find the right reg op");
   }
 
-  const MCOperand& findImmOp() const {
+  const MCOperand& findGImmOp() const {
     // assume that only one immOp in per RV inst
     for (auto& op : Operands) {
       if (op.isGImm()) {

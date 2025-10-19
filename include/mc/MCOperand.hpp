@@ -84,7 +84,7 @@ class MCOperand {
   /// when op is arith: use 12 elements
   /// when op is branch: use 13 elements (the lowest never used)
   /// when op is jump: use 21 elements (the lowest never used)
-  std::array<unsigned char, 21> used{};
+  // std::array<unsigned char, 21> used{};
 
 public:
   MCOperand() : DFPImm(0) {}
@@ -207,19 +207,6 @@ public:
 
     /// change Kind
     Imm = encoding;
-  }
-
-  /// only for imm operands
-  /// closed interval
-  uint32_t getImmSlice(uint8_t upper, uint8_t lower) {
-    for (uint8_t iter = lower; iter <= upper; ++iter) {
-      // utils_assert()
-      used[iter] = 1;
-    }
-
-    // fit Imm/SFPImm/DFPImm
-
-    return (Imm >> (lower - 1)) & ((1u << (upper - lower + 1)) - 1);
   }
 
   /// TODO: dump / verify

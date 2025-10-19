@@ -223,6 +223,10 @@ inline uint64_t signIntCompress(uint64_t integer, unsigned size) {
   }
 }
 
+inline uint32_t signIntSlice(uint64_t interger, unsigned high, unsigned low) {
+  return ((interger & ((1 << (high + 1)) - 1)) & (0xffffffff << low)) >> low;
+}
+
 } // namespace utils
 
 #endif
