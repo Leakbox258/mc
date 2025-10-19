@@ -8,14 +8,17 @@
 #include "utils/ADT/StringMap.hpp"
 #include "utils/ADT/StringRef.hpp"
 #include "utils/ADT/StringSet.hpp"
+#include "utils/macro.hpp"
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <deque>
 #include <elf.h>
 #include <fstream>
 #include <ostream>
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace mc {
@@ -44,7 +47,7 @@ private:
   /// .text
   size_ty TextOffset = 0;
   StringMap<size_ty> TextLabels;
-  std::vector<MCInst> Insts;
+  std::deque<MCInst> Insts; // avoid realloction
   std::vector<MCExpr> Exprs;
 
   /// .rela.text
@@ -126,6 +129,19 @@ public:
     auto newOffset = incTextOffset(inst.isCompressed());
 
     Insts.push_back(std::move(inst));
+
+    return newOffset;
+  }
+
+  MCInst* newTextInst(const StringRef OpCode LIFETIME_BOUND) {
+    this->Insts.emplace_back(MCInst(OpCode));
+
+    return &this->Insts.back();
+  }
+
+  size_ty commitTextInst() {
+
+    auto newOffset = incTextOffset(this->Insts.back().isCompressed());
 
     return newOffset;
   }

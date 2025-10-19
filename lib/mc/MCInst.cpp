@@ -14,12 +14,8 @@ using namespace mc;
 void MCInst::reloSym(int64_t offset) {
   uint64_t encoding;
 
-  if (isBranch()) {
-    /// 12 bits offset
-    encoding = utils::signIntCompress<12 + 1>(offset);
-  } else if (isJmp()) {
-    /// 20 bits offset
-    encoding = utils::signIntCompress<20 + 1>(offset);
+  if (isBranch() || isJmp()) {
+    encoding = offset;
   } else {
     /// check modifiers
     auto mod = getModifier();

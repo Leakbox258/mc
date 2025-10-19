@@ -1,6 +1,7 @@
 #include "utils/ADT/SmallVector.hpp"
 #include "utils/ADT/StringRef.hpp"
 #include "utils/misc.hpp"
+#include <cstdio>
 #include <print>
 
 template <typename T, std::size_t N>
@@ -38,6 +39,26 @@ int main() {
     length += high_bit - low_bit + 1;
   }
   std::print("length: {}\n", length);
+
+  // utils::ADT::StringRef pattern(
+  //     "offset[12|10:5] rs2[4:0] rs1[4:0] 000 offset[4:1|11] 1100011");
+
+  // auto pattern_array = pattern.split<8>(' ');
+
+  // for (auto& pat : pattern_array) {
+  //   // std::printf("%s\n", pat.c_str());
+  // }
+
+  utils::ADT::StringRef pattern2("[20|10:1|11|19:12]");
+
+  auto pattern_array2 = pattern2.slice(1, pattern2.size() - 1).split<8>('|');
+
+  std::printf("%s size: %ld \n", pattern2.slice(1, pattern2.size() - 1).c_str(),
+              pattern2.slice(1, pattern2.size() - 1).size());
+
+  for (auto& pat2 : pattern_array2) {
+    std::printf("%s size: %ld\n", pat2.c_str(), pat2.size());
+  }
 
   return 0;
 }

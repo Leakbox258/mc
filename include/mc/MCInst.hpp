@@ -27,7 +27,9 @@ private:
   SmallVector<MCOperand, 6> Operands;
 
 public:
-  MCInst() = delete;
+  explicit MCInst(const StringRef& _OpCode LIFETIME_BOUND)
+      : OpCode(parser::MnemonicFind(_OpCode.c_str())) {}
+
   explicit MCInst(const MCOpCode* _OpCode LIFETIME_BOUND, Location _Loc,
                   size_ty _Offset)
       : OpCode(_OpCode), Loc(_Loc), Offset(_Offset) {}
@@ -58,12 +60,12 @@ public:
     return Operands[Idx];
   }
 
-  bool isCompressed() const { return OpCode->name.begin_with("c."); }
+  bool isCompressed() const { return OpCode->name.begin_with("C."); }
 
   /// allow 20 bits offset
-  bool isJmp() const { return OpCode->name.begin_with("j"); }
+  bool isJmp() const { return OpCode->name.begin_with("J"); }
 
-  bool isBranch() const { return OpCode->name.begin_with("b"); }
+  bool isBranch() const { return OpCode->name.begin_with("B"); }
 
   MCExpr::ExprTy getModifier() const {
     for (auto& operand : Operands) {
@@ -77,6 +79,7 @@ public:
 
   size_ty getOffset() const { return Offset; }
   void modifyOffset(size_ty newOffset) { Offset = newOffset; }
+  void modifyLoc(Location newLoc) { Loc = newLoc; }
 
   using const_iter = decltype(Operands)::const_iter;
   using const_rev_iter = decltype(Operands)::const_rev_iter;
@@ -118,9 +121,9 @@ public:
   uint32_t makeEncoding() const;
 
 private:
-  /// 0 = Rd, 1 = Rs1, 2 = Rs2, 3 = Rs3
+  /// 0 = Rd(optional), 1 = Rs1, 2 = Rs2, 3 = Rs3
   template <unsigned idx> const MCOperand& findRegOp() const {
-    int i = 0;
+    int i = OpCode->hasRd ? 0 : 1;
     for (auto& op : Operands) {
       if (!op.isReg()) {
         continue;

@@ -182,7 +182,7 @@ public:
     std::array<StringRef, N> elements{};
 
     unsigned cnt = 0;
-    while (*current != '\0') {
+    while (*current != '\0' && current < end()) {
 
       if (*current == splitor) {
         if (current != last) {

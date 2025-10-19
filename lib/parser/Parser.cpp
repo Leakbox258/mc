@@ -11,7 +11,6 @@
 #include "utils/misc.hpp"
 #include <cstddef>
 #include <cstdint>
-#include <optional>
 #include <string>
 #include <system_error>
 #include <tuple>
@@ -25,7 +24,7 @@ using SmallVector = utils::ADT::SmallVector<T, N>;
 void Parser::parse() {
 
   auto token = this->lexer.nextToken();
-  std::optional<MCInst> curInst = std::nullopt;
+  MCInst* curInst = nullptr;
   SmallVector<std::string, 4> DirectiveStack;
   MCContext::size_ty curOffset = 0;
 
@@ -40,7 +39,7 @@ void Parser::parse() {
   };
 
   auto JmpBrHelper = [&](const StringRef& label) {
-    ctx.addReloInst(&(*curInst), label.str());
+    ctx.addReloInst(curInst, label.str());
 
     /// 12 bits offset padding
     curInst->addOperand(MCOperand::makeImm(0));
@@ -53,8 +52,8 @@ void Parser::parse() {
     case TokenType::NEWLINE:
       /// Inst commit
       if (curInst) {
-        curOffset = ctx.addTextInst(std::move(*curInst));
-        curInst = std::nullopt;
+        curOffset = ctx.commitTextInst();
+        curInst = nullptr;
       }
       advance();
       break;
@@ -281,7 +280,10 @@ void Parser::parse() {
       break;
     case TokenType::INSTRUCTION: {
       /// must empty
-      curInst = MCInst(token.lexeme, token.loc, curOffset);
+
+      curInst = ctx.newTextInst(token.lexeme);
+      curInst->modifyOffset(curOffset);
+      curInst->modifyLoc(token.loc);
 
       auto [instAlign, padInst] =
           (*curInst).isCompressed()
@@ -319,10 +321,13 @@ void Parser::parse() {
       advance();
       break;
     case TokenType::LABEL_DEFINITION:
+      /// EG: main:
 
       utils_assert(DirectiveStack.back() == ".text",
                    "expecting ddefine label in .text section");
-      ctx.addTextLabel(token.lexeme);
+      utils_assert(
+          ctx.addTextLabel(token.lexeme.substr(0, token.lexeme.length() - 1)),
+          "text label redefinition!");
 
       advance();
       break;
@@ -332,6 +337,10 @@ void Parser::parse() {
     default:
       utils::unreachable("unkwnow type of current token");
     }
+  }
+
+  if (curInst) {
+    ctx.commitTextInst();
   }
 }
 

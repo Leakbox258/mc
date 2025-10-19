@@ -77,15 +77,17 @@ private:
   parseBitRange(StringRef BitRange) {
     // 4:0
     // 20|10:1|11|19:12
-    auto concat_range = BitRange.split<8>('|');
 
     std::array<std::pair<uint16_t, uint16_t>, 8> bit_range{};
+
+    auto concat_range = BitRange.split<8>('|');
+
     unsigned length = 0;
     unsigned highest = 0;
     unsigned idx = 0;
 
     for (auto rit = concat_range.rbegin(); rit != concat_range.rend(); ++rit) {
-      auto& range = *rit;
+      auto range = *rit;
 
       if (range.empty()) {
         continue;
@@ -113,7 +115,10 @@ private:
 public:
   StringRef name;
 
+  /// 0 means no imm, 1 means consistent, otherwise imm will be splited
   unsigned imm_distribute = 0;
+
+  bool hasRd = false;
 
   /// NOTE: for constexpr, std::array need a more
   /// large range than 6 which is more ideal
@@ -134,9 +139,9 @@ public:
 
       auto& raw_pattern = *raw_pattern_it;
 
-      if (raw_pattern.empty()) {
-        continue;
-      }
+      // if (raw_pattern.empty()) {
+      //   continue;
+      // }
 
       EnCoding encoding =
           StringSwitch<EnCoding>(raw_pattern)
@@ -145,7 +150,7 @@ public:
                            /// NOTE: for constexpr, std::array need a
                            /// more large range than 2 which is more ideal
                            auto [bit_range, length, highest] =
-                               parseBitRange(Str.slice(7, Str.size() - 2));
+                               parseBitRange(Str.slice(7, Str.size() - 1));
 
                            return EnCoding{EnCoding::kImm, length, highest,
                                            bit_range, std::nullopt};
@@ -157,7 +162,7 @@ public:
                            /// NOTE: for constexpr, std::array need a
                            /// more large range than 2 which is more ideal
                            auto [bit_range, length, highest] =
-                               parseBitRange(Str.slice(4, Str.size() - 2));
+                               parseBitRange(Str.slice(4, Str.size() - 1));
 
                            return EnCoding{EnCoding::kImm, length, highest,
                                            bit_range, std::nullopt};
@@ -168,7 +173,7 @@ public:
                            /// NOTE: for constexpr, std::array need a
                            /// more large range than 2 which is more ideal
                            auto [bit_range, length, highest] =
-                               parseBitRange(Str.slice(6, Str.size() - 2));
+                               parseBitRange(Str.slice(6, Str.size() - 1));
 
                            return EnCoding{EnCoding::kImm, length, highest,
                                            bit_range, std::nullopt};
@@ -179,25 +184,29 @@ public:
                            /// NOTE: for constexpr, std::array need a
                            /// more large range than 2 which is more ideal
                            auto [bit_range, length, highest] =
-                               parseBitRange(Str.slice(5, Str.size() - 2));
+                               parseBitRange(Str.slice(5, Str.size() - 1));
 
                            return EnCoding{EnCoding::kImm, length, highest,
                                            bit_range, std::nullopt};
                          })
               .BeginWith("rd_",
-                         [](const StringRef& Str) -> EnCoding {
+                         [this](const StringRef& Str) -> EnCoding {
                            // [2:0]
                            auto [bit_range, length, highest] =
-                               parseBitRange(Str.slice(4, Str.size() - 2));
+                               parseBitRange(Str.slice(4, Str.size() - 1));
+
+                           hasRd = true;
 
                            return EnCoding{EnCoding::kRd_short, length, highest,
                                            bit_range, std::nullopt};
                          })
               .BeginWith("rd",
-                         [](const StringRef& Str) -> EnCoding {
+                         [this](const StringRef& Str) -> EnCoding {
                            // [4:0]
                            auto [bit_range, length, highest] =
-                               parseBitRange(Str.slice(3, Str.size() - 2));
+                               parseBitRange(Str.slice(3, Str.size() - 1));
+
+                           hasRd = true;
 
                            return EnCoding{EnCoding::kRd, length, highest,
                                            bit_range, std::nullopt};
@@ -209,7 +218,7 @@ public:
 
                     // [4:0]
                     auto [bit_range, length, highest] = parseBitRange(Str.slice(
-                        *(Str.c_str() + 3) == '_' ? 5 : 4, Str.size() - 2));
+                        *(Str.c_str() + 3) == '_' ? 5 : 4, Str.size() - 1));
 
                     uint16_t kind = idx + (*(Str.c_str() + 3) == '_' ? 9 : 5);
 
@@ -220,7 +229,7 @@ public:
                          [](const StringRef& Str) -> EnCoding {
                            // [2:0]
                            auto [bit_range, length, highest] =
-                               parseBitRange(Str.slice(3, Str.size() - 2));
+                               parseBitRange(Str.slice(3, Str.size() - 1));
 
                            return EnCoding{EnCoding::kRd, length, highest,
                                            bit_range, std::nullopt};
@@ -229,7 +238,7 @@ public:
                          [](const StringRef& Str) -> EnCoding {
                            // [3:0]
                            auto [bit_range, length, highest] =
-                               parseBitRange(Str.slice(5, Str.size() - 2));
+                               parseBitRange(Str.slice(5, Str.size() - 1));
 
                            return EnCoding{EnCoding::kMemFence, length, highest,
                                            bit_range, std::nullopt};
@@ -238,7 +247,7 @@ public:
                          [](const StringRef& Str) -> EnCoding {
                            // [3:0]
                            auto [bit_range, length, highest] =
-                               parseBitRange(Str.slice(5, Str.size() - 2));
+                               parseBitRange(Str.slice(5, Str.size() - 1));
 
                            return EnCoding{EnCoding::kMemFence, length, highest,
                                            bit_range, std::nullopt};
