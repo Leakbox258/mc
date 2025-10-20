@@ -48,7 +48,7 @@ private:
   size_ty TextOffset = 0;
   StringMap<size_ty> TextLabels;
   std::deque<MCInst> Insts; // avoid realloction
-  std::vector<MCExpr> Exprs;
+  std::deque<MCExpr> Exprs; // avoid realloction
 
   /// .rela.text
 
@@ -61,9 +61,11 @@ public:
   };
 
 private:
-  std::set<std::pair<std::string, NdxSection>>
-      ReloSymbols; // symbols cross sections or rely on extern libs
+  // symbols cross sections, define in .text, .data, .bss
+  std::set<std::pair<std::string, NdxSection>> Symbols;
   std::vector<Elf64_Rela> Elf_Relas;
+
+  std::set<std::string> ExternSymbols;
 
   /// .data
   StringMap<size_ty> DataVariables;
@@ -92,6 +94,8 @@ public:
   MCContext& operator=(const MCContext&) = delete;
 
 private:
+  void mkStrTab();
+
   /// .text symbol inline
   void Relo();
 
@@ -119,7 +123,7 @@ public:
   }
 
   bool addReloSym(StringRef Str, NdxSection ndx) {
-    return this->ReloSymbols.insert({Str.str(), ndx}).second;
+    return this->Symbols.insert({Str.str(), ndx}).second;
   }
 
   bool getTextOffset() const { return TextOffset; }

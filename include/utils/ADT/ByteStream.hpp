@@ -3,6 +3,7 @@
 
 #include "SmallVector.hpp"
 #include "StringRef.hpp"
+#include <string>
 
 namespace utils {
 namespace ADT {
@@ -45,8 +46,18 @@ struct ByteStream {
     return *this;
   }
 
+  ByteStream& operator<<(const std::string& Value) {
+    for (size_ty i = 0; i < Value.size(); ++i) {
+      buffer.push_back(Value[i]);
+    }
+
+    return *this;
+  }
+
   /// for .strtab / .shstrtab
   size_ty findOffset(StringRef Str) const;
+
+  bool hasSym(StringRef Str) const;
 
   /// for debug
   void dump() const;

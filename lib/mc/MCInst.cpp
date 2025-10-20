@@ -12,27 +12,17 @@
 using namespace mc;
 
 void MCInst::reloSym(int64_t offset) {
-  uint64_t encoding;
 
-  if (isBranch() || isJmp()) {
-    encoding = offset;
+  if (auto mod = getModifier()) {
+    auto op = std::find_if(Operands.begin(), Operands.end(),
+                           [&](MCOperand& op) { return op.isExpr(); });
+    op->RewriteSymRelo(utils::signIntCompress(offset, getModifierSize(mod)));
   } else {
-    /// check modifiers
-    auto mod = getModifier();
-    utils_assert(mod, "ExprTy is invalid");
-    encoding = utils::signIntCompress(offset, getModifierSize(mod));
-  }
-
-  if (isBranch() || isJmp()) {
+    // usually branch & jumps without any explicit modifier
     auto op = std::find_if(Operands.begin(), Operands.end(),
                            [&](MCOperand& op) { return op.isImm(); });
     auto& imm = op->getImm();
-    imm = encoding;
-
-  } else {
-    auto op = std::find_if(Operands.begin(), Operands.end(),
-                           [&](MCOperand& op) { return op.isExpr(); });
-    op->RewriteSymRelo(encoding);
+    imm = offset;
   }
 
   return;
@@ -44,10 +34,10 @@ uint32_t MCInst::getReloType() const {
     /// jmp / branch inst
     /// TODO: to fit more relo type
     return StringSwitch<uint32_t>(OpCode->name)
-        .BeginWith("j", static_cast<uint32_t>(R_RISCV_JAL))
-        .BeginWith("b", static_cast<uint32_t>(R_RISCV_BRANCH))
-        .BeginWith("c.j", static_cast<uint32_t>(R_RISCV_RVC_JUMP))
-        .BeginWith("c.b", static_cast<uint32_t>(R_RISCV_RVC_BRANCH))
+        .BeginWith("J", static_cast<uint32_t>(R_RISCV_JAL))
+        .BeginWith("B", static_cast<uint32_t>(R_RISCV_BRANCH))
+        .BeginWith("C_J", static_cast<uint32_t>(R_RISCV_RVC_JUMP))
+        .BeginWith("C_B", static_cast<uint32_t>(R_RISCV_RVC_BRANCH))
         .Error();
   } else {
     using ExprTy = MCExpr::ExprTy;

@@ -207,6 +207,7 @@ public:
 
     /// change Kind
     Imm = encoding;
+    this->Kind = OpTy::kImme;
   }
 
   /// TODO: dump / verify

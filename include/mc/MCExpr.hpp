@@ -28,7 +28,7 @@ private:
   std::string Symbol;
   uint64_t Append; // +/-
 public:
-  MCExpr() : Kind(kInValid), Symbol() {}
+  // MCExpr() : Kind(kInValid), Symbol() {}
 
   MCExpr(ExprTy ty, StringRef _Symbol, uint64_t _Append)
       : Kind(std::move(ty)), Symbol(_Symbol.str()), Append(_Append) {}

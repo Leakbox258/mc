@@ -248,7 +248,13 @@ void Parser::parse() {
       advance();
       utils_assert(token.type == TokenType::LPAREN,
                    "expecting left paren after a modifier");
+      advance();
+
       auto Symbol = token.lexeme; // IDENTIFIER
+
+      utils_assert(token.type == TokenType::IDENTIFIER,
+                   "expecting an identifier in a modifier");
+
       advance();
 
       uint64_t Append = 0;

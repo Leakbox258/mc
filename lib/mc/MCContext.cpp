@@ -10,6 +10,29 @@
 
 using namespace mc;
 
+void MCContext::mkStrTab() {
+  /// gather .strtab context
+  /// include label, symbol(relos, variables)
+  StrTabBuffer << '\x00';
+
+  /// find extern symbol in relo insts
+  for (auto& [_, sym] : ReloInst) {
+    if (!StrTabBuffer.hasSym(sym)) {
+      StrTabBuffer << sym << '\x00';
+    }
+  }
+
+  for (const auto& [relo_sym, ndx] : Symbols) {
+    StrTabBuffer << relo_sym << '\x00';
+  }
+
+  for (const auto& label : TextLabels.keys()) {
+    if (!StrTabBuffer.hasSym(label)) {
+      StrTabBuffer << label << '\x00';
+    }
+  }
+}
+
 void MCContext::Relo() {
 
   for (auto [inst, sym] : ReloInst) {
@@ -24,15 +47,17 @@ void MCContext::Relo() {
     }
     /// else if: symbols from .data or .bss configure Elf_Rela
     else if (auto iter =
-                 std::find_if(ReloSymbols.begin(), ReloSymbols.end(),
+                 std::find_if(Symbols.begin(), Symbols.end(),
                               [&](auto&& elem) { return elem.first == sym; });
-             iter != ReloSymbols.end()) {
+             iter != Symbols.end()) {
 
-      uint32_t idx = std::distance(ReloSymbols.begin(), iter);
+      auto [sym, _] = *iter;
+
       Elf64_Rela Rela = {};
       Rela.r_offset = inst->getOffset();
-      Rela.r_info = ELF64_R_INFO(
-          idx, inst->getReloType()); // idx pointer to idx in .symtab
+      Rela.r_info =
+          ELF64_R_INFO(5 + std::distance(Symbols.begin(), iter),
+                       inst->getReloType()); // idx pointer to idx in .symtab
 
       auto expr = inst->getExprOp();
 
@@ -43,18 +68,21 @@ void MCContext::Relo() {
       Elf_Relas.emplace_back(std::move(Rela));
 
       inst->reloSym(0ll);
-
     }
     /// extern symbols
     else {
-      ReloSymbols.insert({
-          sym,
-          NdxSection::und,
-      });
-      uint32_t idx = ReloSymbols.size() - 1;
+      this->ExternSymbols.insert(sym);
+
       Elf64_Rela Rela = {};
       Rela.r_offset = inst->getOffset();
-      Rela.r_info = ELF64_R_INFO(idx, inst->getReloType());
+      Rela.r_info = ELF64_R_INFO(
+          5 + Symbols.size() +
+              std::distance(ExternSymbols.begin(), ExternSymbols.find(sym)),
+          inst->getReloType());
+
+      Elf_Relas.emplace_back(std::move(Rela));
+
+      inst->reloSym(0ll);
     }
   }
 }
@@ -117,18 +145,6 @@ void MCContext::Ehdr_Shdr() {
     mkAlign(1);
     Offsets.insert(".strtab", offset);
 
-    /// gather .strtab context
-    /// include label, symbol(relos, variables)
-    StrTabBuffer << '\x00';
-
-    for (const auto& [relo_sym, ndx] : ReloSymbols) {
-      StrTabBuffer << relo_sym << '\x00';
-    }
-
-    for (const auto& label : TextLabels.keys()) {
-      StrTabBuffer << label << '\x00';
-    }
-
     offset += StrTabBuffer.size();
   }
 
@@ -156,6 +172,13 @@ void MCContext::Ehdr_Shdr() {
 
     /// labels(local)
     for (const auto& label : TextLabels.keys()) {
+      if (std::find_if(Symbols.begin(), Symbols.end(), [&](const auto& tuple) {
+            return label == std::get<0>(tuple);
+          }) != Symbols.end()) {
+        /// if a label will be declare as global, then avoid declare as local
+        continue;
+      }
+
       Elf64_Sym symbol = {};
 
       symbol.st_name = StrTabBuffer.findOffset(label);
@@ -170,7 +193,7 @@ void MCContext::Ehdr_Shdr() {
     }
 
     /// relo symbols(local)
-    for (const auto& [sym, ndx] : ReloSymbols) {
+    for (const auto& [sym, ndx] : Symbols) {
       Elf64_Sym symbol = {};
 
       symbol.st_name = StrTabBuffer.findOffset(sym);
@@ -181,13 +204,26 @@ void MCContext::Ehdr_Shdr() {
       Elf_Syms.emplace_back(std::move(symbol));
     }
 
+    /// extern syms
+
+    for (const auto& sym : ExternSymbols) {
+      Elf64_Sym symbol = {};
+
+      symbol.st_name = StrTabBuffer.findOffset(sym);
+      symbol.st_info = ELF64_ST_INFO(STB_GLOBAL, STT_NOTYPE);
+      symbol.st_other = ELF64_ST_VISIBILITY(STV_DEFAULT); // visibility
+      symbol.st_shndx = und;
+
+      Elf_Syms.emplace_back(std::move(symbol));
+    }
+
     offset += (Elf_Syms.size()) * sizeof(Elf64_Sym);
   }
 
   {
     mkAlign(8);
     Offsets.insert(".rela.text", offset);
-    offset += Elf_Relas.size() * sizeof(Elf64_Rela);
+    offset += (Elf_Relas.size()) * sizeof(Elf64_Rela);
   }
 
   {
@@ -277,7 +313,11 @@ void MCContext::Ehdr_Shdr() {
 }
 
 void MCContext::writein() {
+
+  this->mkStrTab();
+
   this->Relo();
+
   this->Ehdr_Shdr();
 
   size_ty curOffset = 0;
